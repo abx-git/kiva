@@ -1,5 +1,5 @@
--- Kiva — Referenzschema für Supabase (Postgres + RLS)
--- Im Supabase SQL Editor ausführen; Storage-Buckets manuell anlegen.
+-- Kiva — Postgres tables + RLS (reference)
+-- Prefer the all-in-one script: setup.sql (includes Storage buckets/policies).
 
 -- Profile (optional, erweiterbar)
 create table if not exists public.profiles (

@@ -1,5 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { signInWithPassword, signOut } from './auth/login';
+import { getSession } from './lib/supabase';
 import type { KivaConfig } from './config';
 import { isSupabaseConfigured } from './config';
 import {
@@ -312,7 +313,8 @@ async function onLogin(config: KivaConfig, email: string, password: string): Pro
     renderApp(controller.root, controller.config, controller.getState());
     return;
   }
-  controller.setState({ loading: false, error: null });
+  const session = await getSession(config);
+  applySession(session);
 }
 
 async function onLogout(config: KivaConfig): Promise<void> {
@@ -427,8 +429,8 @@ export function applySession(session: Session | null): void {
   const nextUserId = session?.user.id ?? null;
   const prevUserId = prev.session?.user.id ?? null;
 
-  // Supabase emits INITIAL_SESSION right after startup; re-rendering login wipes typed input.
-  if (nextUserId === prevUserId && nextView === prev.view) {
+  // Supabase emits INITIAL_SESSION after startup with null session; don't wipe the login form.
+  if (!session && !prev.session && prev.view === 'login' && nextView === 'login') {
     return;
   }
 

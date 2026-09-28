@@ -33,9 +33,23 @@ The deploy workflow runs the **build** job in the **`github-pages` environment**
 
 Without GitHub config the deploy build fails; the live app cannot authenticate.
 
-## Supabase
+## Supabase (required for more than sign-in)
 
-SQL reference: [supabase/kiva/schema.sql](./supabase/kiva/schema.sql)
+The PWA only talks to **Supabase** (Auth + Postgres + Storage). URL and anon key in `.env` / GitHub secrets are **not** enough: you must create the Kiva tables and buckets once.
+
+### One-time setup
+
+1. **Supabase Dashboard** → your project → **SQL** → **New query**.
+2. Paste and run the full script **[supabase/kiva/setup.sql](./supabase/kiva/setup.sql)**.
+3. **Authentication** → **Users** → **Add user** (email + password) — login uses `auth.users`, not your custom tables.
+4. (Optional) **Storage** → bucket `instructions` → upload a file, e.g. `onboarding/willkommen.pdf`, matching the demo row in `setup.sql`.
+5. In the app: sign in → **Refresh catalog**.
+
+Table reference (same content split): [supabase/kiva/schema.sql](./supabase/kiva/schema.sql), [storage notes](./supabase/kiva/storage.sql).
+
+### Deutsch (Kurz)
+
+Ohne SQL-Setup siehst du in Supabase **keine Tabellen** — das ist normal, bis du `setup.sql` ausführst. **Anmelden** geht trotzdem, wenn unter **Authentication → Users** ein Nutzer existiert. **Instruktionen laden** erst nach Tabellen + optional Datei im Storage-Bucket `instructions`.
 
 ## Architecture (short)
 

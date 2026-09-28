@@ -19,7 +19,7 @@ export async function fetchPublishedInstructions(
     .order('title');
 
   if (error) {
-    return { ok: false, message: error.message };
+    return { ok: false, message: mapPostgresSetupError(error.message) };
   }
 
   return { ok: true, rows: (data ?? []) as InstructionRow[] };
@@ -40,6 +40,17 @@ export async function downloadInstructionBlob(
   }
 
   return { ok: true, blob: data };
+}
+
+function mapPostgresSetupError(message: string): string {
+  if (
+    /schema cache/i.test(message) ||
+    /does not exist/i.test(message) ||
+    /could not find the table/i.test(message)
+  ) {
+    return 'Database not set up yet. In Supabase: SQL Editor → run the script supabase/kiva/setup.sql (creates tables and storage).';
+  }
+  return message;
 }
 
 export function fileNameFromStoragePath(storagePath: string): string {
