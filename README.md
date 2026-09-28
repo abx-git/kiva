@@ -70,6 +70,17 @@ Der Browser-Key (`VITE_SUPABASE_ANON_KEY`) darf **kein DDL** ausführen. Damit d
 
 **Alternative ohne DB-URL:** Supabase CLI mit Personal Access Token (`SUPABASE_ACCESS_TOKEN`) und `supabase link` — im Repo ist der Weg über `npm run db:setup` + `SUPABASE_DB_URL` vorgesehen.
 
+### Tablet / kein Copy-Paste in Supabase SQL Editor
+
+Du musst **kein SQL** in Supabase einfügen. Einmal einrichten, dann per Knopfdruck:
+
+1. Supabase → **Project Settings** → **Database** → **Connection string** → **URI** (Direct) kopieren (eine Zeile, Passwort einsetzen).
+2. GitHub → Repo **kiva** → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**  
+   Name: `SUPABASE_DB_URL`, Wert: die URI.
+3. GitHub → **Actions** → **Apply Kiva Supabase setup** → **Run workflow**.
+
+Das legt Tabellen und Storage-Buckets an. Nutzer weiterhin unter Supabase **Authentication → Users** anlegen.
+
 ## Architecture (short)
 
 - **E2/ET2:** browser app + local engine + optional remote adapter (no custom backend).
