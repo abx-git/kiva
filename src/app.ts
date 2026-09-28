@@ -29,6 +29,8 @@ export function createInitialState(session: Session | null): AppState {
     downloadingId: null,
     artifacts: [],
     uploadingArtifactId: null,
+    registeringInstructionId: null,
+    notice: null,
   };
 }
 
@@ -44,6 +46,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
       </div>
     </header>
     ${!configured ? `<div class="alert warn" role="status">Supabase is not configured for this build. Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (local: <code>kiva/.env</code>; GitHub Pages: repository secrets) and redeploy.</div>` : ''}
+    ${state.notice ? `<div class="alert ok" role="status">${escapeHtml(state.notice)}</div>` : ''}
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
     ${state.view === 'login' ? renderLogin(configured, state.loading) : renderHome(state)}
   `;
@@ -78,27 +81,21 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
       });
     });
 
-    root.querySelectorAll<HTMLButtonElement>('[data-register-id]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const instructionId = btn.dataset.registerId;
-        if (!instructionId) return;
-        const input = root.querySelector<HTMLInputElement>(`#file-${instructionId}`);
-        input?.click();
-      });
-    });
-
     root.querySelectorAll<HTMLInputElement>('[data-file-input]').forEach((input) => {
       input.addEventListener('change', () => {
         const instructionId = input.dataset.fileInput;
         const file = input.files?.[0];
-        if (instructionId && file) {
-          const visibility =
-            root.querySelector<HTMLInputElement>(`#vis-${instructionId}`)?.checked
-              ? 'community'
-              : 'private';
-          void onRegisterArtifact(instructionId, file, visibility);
-        }
         input.value = '';
+        if (!instructionId) return;
+        if (!file) {
+          controller?.setState({ notice: null });
+          return;
+        }
+        const visibility =
+          root.querySelector<HTMLInputElement>(`#vis-${instructionId}`)?.checked
+            ? 'community'
+            : 'private';
+        void onRegisterArtifact(instructionId, file, visibility);
       });
     });
 
@@ -164,7 +161,7 @@ function renderHome(state: AppState): string {
     <section class="card" aria-labelledby="list-title">
       <h2 id="list-title">Published instructions</h2>
       <p class="section-lead">Each row is one instruction package on the server. Save it offline, export it to work elsewhere, then attach your result below.</p>
-      ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId)}
+      ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId, state.registeringInstructionId)}
     </section>
     <section class="card" aria-labelledby="artifacts-title">
       <h2 id="artifacts-title">Your result files</h2>
@@ -178,6 +175,7 @@ function renderInstructionList(
   items: InstructionListItem[],
   loading: boolean,
   downloadingId: string | null,
+  registeringInstructionId: string | null,
 ): string {
   if (loading && items.length === 0) {
     return `<p class="muted">Loading instruction list…</p>`;
@@ -223,12 +221,20 @@ function renderInstructionList(
             >Export to device</button>
           </div>
           <div class="register-row">
+            <p class="share-hint"><strong>Share with team:</strong> leave off for a private server copy (only you). Turn on if colleagues should see this file after <strong>Send to server</strong>.</p>
             <label class="checkbox">
               <input type="checkbox" id="vis-${escapeHtml(item.id)}" />
               Share with team when uploaded
             </label>
-            <input type="file" class="sr-only" id="file-${escapeHtml(item.id)}" data-file-input="${escapeHtml(item.id)}" />
-            <button type="button" class="secondary compact" data-register-id="${escapeHtml(item.id)}">Attach result file</button>
+            <label class="file-attach-btn secondary compact">
+              ${registeringInstructionId === item.id ? 'Attaching…' : 'Attach result file'}
+              <input
+                type="file"
+                id="file-${escapeHtml(item.id)}"
+                data-file-input="${escapeHtml(item.id)}"
+                ${registeringInstructionId === item.id ? 'disabled' : ''}
+              />
+            </label>
           </div>
         </li>`;
         })
@@ -332,7 +338,7 @@ async function onLogout(config: KivaConfig): Promise<void> {
 
 export async function bootstrapHomeData(config: KivaConfig): Promise<void> {
   if (!controller) return;
-  controller.setState({ instructionsLoading: true, error: null });
+  controller.setState({ instructionsLoading: true, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   try {
@@ -348,7 +354,7 @@ export async function bootstrapHomeData(config: KivaConfig): Promise<void> {
 
 async function onRefreshInstructions(config: KivaConfig): Promise<void> {
   if (!controller) return;
-  controller.setState({ instructionsLoading: true, error: null });
+  controller.setState({ instructionsLoading: true, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   const result = await syncInstructionsFromRemote(config);
@@ -368,7 +374,7 @@ async function onDownloadInstruction(
   storagePath: string,
 ): Promise<void> {
   if (!controller) return;
-  controller.setState({ downloadingId: instructionId, error: null });
+  controller.setState({ downloadingId: instructionId, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   const result = await cacheInstructionFile(config, instructionId, storagePath);
@@ -389,15 +395,36 @@ async function onRegisterArtifact(
   visibility: 'private' | 'community',
 ): Promise<void> {
   if (!controller) return;
+  controller.setState({
+    registeringInstructionId: instructionId,
+    error: null,
+    notice: null,
+  });
+  renderApp(controller.root, controller.config, controller.getState());
+
   try {
     await registerArtifactFromFile(instructionId, file, visibility);
     const artifacts = await refreshArtifactList();
-    controller.setState({ artifacts, error: null });
+    const shareNote =
+      visibility === 'community'
+        ? 'It will be visible to teammates after Send to server.'
+        : 'It stays private on the server until you share a community upload later.';
+    controller.setState({
+      artifacts,
+      registeringInstructionId: null,
+      error: null,
+      notice: `Attached “${file.name}”. See Your result files below, then tap Send to server. ${shareNote}`,
+    });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Registration failed.';
-    controller.setState({ error: message });
+    const message = err instanceof Error ? err.message : 'Could not attach file.';
+    controller.setState({
+      registeringInstructionId: null,
+      error: message,
+      notice: null,
+    });
   }
   renderApp(controller.root, controller.config, controller.getState());
+  document.getElementById('artifacts-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function onUploadArtifact(config: KivaConfig, artifactId: string): Promise<void> {
@@ -452,6 +479,8 @@ export function applySession(session: Session | null): void {
     artifacts: session ? prev.artifacts : [],
     downloadingId: null,
     uploadingArtifactId: null,
+    registeringInstructionId: null,
+    notice: null,
   });
   renderApp(controller.root, controller.config, controller.getState());
   if (session) {

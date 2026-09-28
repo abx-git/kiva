@@ -23,4 +23,6 @@ export interface AppState {
   downloadingId: string | null;
   artifacts: LocalArtifactRecord[];
   uploadingArtifactId: string | null;
+  registeringInstructionId: string | null;
+  notice: string | null;
 }
