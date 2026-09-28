@@ -127,18 +127,10 @@ function renderLogin(configured: boolean, loading: boolean): string {
         <button type="submit" ${loading ? 'disabled' : ''}>${loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </section>
-    <div class="roadmap">
-      <strong>In Kiva today</strong>
-      <ul>
-        <li>List and download instructions from the server</li>
-        <li>Offline copy in IndexedDB</li>
-        <li>Register result files and upload to share</li>
-      </ul>
-      <strong>Planned</strong>
-      <ul>
-        <li>Browse community artifacts from other users</li>
-      </ul>
-    </div>
+    <details class="roadmap">
+      <summary>What can I do here?</summary>
+      <p class="roadmap-lead">After sign-in: load instructions, save them offline, upload your result files.</p>
+    </details>
   `;
 }
 
