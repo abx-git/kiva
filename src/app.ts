@@ -47,7 +47,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
     ${state.view === 'login' ? renderLogin(configured, state.loading) : renderHome(state)}
   `;
 
-  if (state.view === 'login' && configured) {
+  if (state.view === 'login') {
     const form = root.querySelector<HTMLFormElement>('#login-form');
     form?.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -305,6 +305,7 @@ export function bindAppController(c: AppController): void {
 async function onLogin(config: KivaConfig, email: string, password: string): Promise<void> {
   if (!controller) return;
   controller.setState({ loading: true, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
   const result = await signInWithPassword(config, email, password);
   if (!result.ok) {
     controller.setState({ loading: false, error: result.message });
@@ -421,13 +422,23 @@ async function onOpenCached(instructionId: string): Promise<void> {
 
 export function applySession(session: Session | null): void {
   if (!controller) return;
+  const prev = controller.getState();
+  const nextView = session ? 'home' : 'login';
+  const nextUserId = session?.user.id ?? null;
+  const prevUserId = prev.session?.user.id ?? null;
+
+  // Supabase emits INITIAL_SESSION right after startup; re-rendering login wipes typed input.
+  if (nextUserId === prevUserId && nextView === prev.view) {
+    return;
+  }
+
   controller.setState({
     session,
-    view: session ? 'home' : 'login',
+    view: nextView,
     loading: false,
     error: null,
-    instructions: session ? controller.getState().instructions : [],
-    artifacts: session ? controller.getState().artifacts : [],
+    instructions: session ? prev.instructions : [],
+    artifacts: session ? prev.artifacts : [],
     downloadingId: null,
     uploadingArtifactId: null,
   });
