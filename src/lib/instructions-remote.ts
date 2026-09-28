@@ -36,7 +36,11 @@ export async function downloadInstructionBlob(
 
   const { data, error } = await supabase.storage.from(INSTRUCTIONS_BUCKET).download(storagePath);
   if (error || !data) {
-    return { ok: false, message: error?.message ?? 'Download failed.' };
+    const raw = error?.message ?? 'Download failed.';
+    const message = /bucket not found/i.test(raw)
+      ? 'Storage bucket "instructions" is missing. Run supabase/kiva/setup.sql or storage-setup.sql in Supabase.'
+      : raw;
+    return { ok: false, message };
   }
 
   return { ok: true, blob: data };

@@ -60,13 +60,14 @@ export async function uploadArtifact(
     .upload(storagePath, blob, { upsert: true, contentType: blob.type || undefined });
 
   if (uploadError) {
+    const message = mapStorageSetupError(uploadError.message);
     const failed: LocalArtifactRecord = {
       ...uploading,
       syncStatus: 'error',
-      errorMessage: uploadError.message,
+      errorMessage: message,
     };
     await saveArtifact(failed);
-    return { ok: false, message: uploadError.message };
+    return { ok: false, message };
   }
 
   const { data: row, error: insertError } = await supabase
@@ -106,6 +107,16 @@ export async function uploadArtifact(
 
 export async function refreshArtifactList(): Promise<LocalArtifactRecord[]> {
   return listAllArtifacts();
+}
+
+function mapStorageSetupError(message: string): string {
+  if (/bucket not found/i.test(message)) {
+    return (
+      'Storage bucket "artifacts" is missing. In Supabase run supabase/kiva/setup.sql or ' +
+      'supabase/kiva/storage-setup.sql (SQL Editor), or create a private bucket named artifacts.'
+    );
+  }
+  return message;
 }
 
 async function hashFileSha256(file: Blob): Promise<string> {

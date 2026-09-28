@@ -53,6 +53,8 @@ Ohne SQL-Setup siehst du in Supabase **keine Tabellen** — das ist normal, bis 
 
 **Login-Fehler „Database error querying schema“:** Der Testnutzer wurde per SQL ohne leere Token-Felder angelegt. Im SQL Editor den **UPDATE**-Block aus [supabase/kiva/test-user.sql](./supabase/kiva/test-user.sql) ausführen — oder Nutzer im Dashboard neu anlegen.
 
+**Upload „Bucket not found“:** Storage-Buckets fehlen. Einmal [supabase/kiva/storage-setup.sql](./supabase/kiva/storage-setup.sql) im SQL Editor ausführen (oder komplett [setup.sql](./supabase/kiva/setup.sql)). Buckets heißen exakt `artifacts` und `instructions` (klein, privat).
+
 ### Cloud Agent: SQL automatisch ausführen lassen
 
 Der Browser-Key (`VITE_SUPABASE_ANON_KEY`) darf **kein DDL** ausführen. Damit der Agent `setup.sql` per Shell anwenden kann, brauchst du eine **Postgres-Verbindung** als Secret:
