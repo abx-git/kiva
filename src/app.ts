@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from './config';
 import {
   refreshArtifactList,
   registerArtifactFromFile,
+  setArtifactVisibility,
   uploadArtifact,
 } from './lib/artifacts-service';
 import type { LocalArtifactRecord } from './lib/artifacts-types';
@@ -84,18 +85,23 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
     root.querySelectorAll<HTMLInputElement>('[data-file-input]').forEach((input) => {
       input.addEventListener('change', () => {
         const instructionId = input.dataset.fileInput;
-        const file = input.files?.[0];
+        const files = input.files ? [...input.files] : [];
         input.value = '';
         if (!instructionId) return;
-        if (!file) {
+        if (files.length === 0) {
           controller?.setState({ notice: null });
           return;
         }
-        const visibility =
-          root.querySelector<HTMLInputElement>(`#vis-${instructionId}`)?.checked
-            ? 'community'
-            : 'private';
-        void onRegisterArtifact(instructionId, file, visibility);
+        void onRegisterArtifacts(instructionId, files);
+      });
+    });
+
+    root.querySelectorAll<HTMLInputElement>('[data-artifact-visibility]').forEach((box) => {
+      box.addEventListener('change', () => {
+        const id = box.dataset.artifactVisibility;
+        if (!id) return;
+        const visibility = box.checked ? 'community' : 'private';
+        void onArtifactVisibilityChange(id, visibility);
       });
     });
 
@@ -120,7 +126,7 @@ function renderHowItWorks(): string {
         <li><strong>Sync from server</strong> — update the instruction list from Supabase.</li>
         <li><strong>Save offline</strong> — store the instruction file inside Kiva on this device.</li>
         <li><strong>Export to device</strong> — download that copy so PDF, CAD, or other apps can open it.</li>
-        <li>Work in your apps, then <strong>Attach result file</strong> and <strong>Send to server</strong>.</li>
+        <li>Work in your apps, then <strong>Attach result file(s)</strong> — set <strong>Share with team</strong> per file — and <strong>Send to server</strong>.</li>
       </ol>
     </section>
   `;
@@ -165,8 +171,8 @@ function renderHome(state: AppState): string {
     </section>
     <section class="card" aria-labelledby="artifacts-title">
       <h2 id="artifacts-title">Your result files</h2>
-      <p class="section-lead">Files you attached to an instruction. <strong>Send to server</strong> uploads them to the team storage.</p>
-      ${renderArtifactList(state.artifacts, state.uploadingArtifactId, state.session?.user.id)}
+      <p class="section-lead">You can attach many files per instruction. Choose <strong>Share with team</strong> separately for each file before <strong>Send to server</strong>.</p>
+      ${renderArtifactList(state.artifacts, state.uploadingArtifactId, state.instructions, state.session?.user.id)}
     </section>
   `;
 }
@@ -221,15 +227,12 @@ function renderInstructionList(
             >Export to device</button>
           </div>
           <div class="register-row">
-            <p class="share-hint"><strong>Share with team:</strong> leave off for a private server copy (only you). Turn on if colleagues should see this file after <strong>Send to server</strong>.</p>
-            <label class="checkbox">
-              <input type="checkbox" id="vis-${escapeHtml(item.id)}" />
-              Share with team when uploaded
-            </label>
+            <p class="share-hint">Pick one or many result files. Sharing is set per file under <strong>Your result files</strong>.</p>
             <label class="file-attach-btn secondary compact">
-              ${registeringInstructionId === item.id ? 'Attaching…' : 'Attach result file'}
+              ${registeringInstructionId === item.id ? 'Attaching…' : 'Attach result file(s)'}
               <input
                 type="file"
+                multiple
                 id="file-${escapeHtml(item.id)}"
                 data-file-input="${escapeHtml(item.id)}"
                 ${registeringInstructionId === item.id ? 'disabled' : ''}
@@ -243,16 +246,21 @@ function renderInstructionList(
   `;
 }
 
+function instructionTitleFor(instructions: InstructionListItem[], instructionId: string): string {
+  return instructions.find((i) => i.id === instructionId)?.title ?? 'Instruction';
+}
+
 function renderArtifactList(
   artifacts: LocalArtifactRecord[],
   uploadingId: string | null,
+  instructions: InstructionListItem[],
   userId?: string,
 ): string {
   if (!userId) {
     return `<p class="muted">Not signed in.</p>`;
   }
   if (artifacts.length === 0) {
-    return `<p class="muted">Nothing attached yet. After you finish work in another app, use <strong>Attach result file</strong> on the matching instruction.</p>`;
+    return `<p class="muted">Nothing attached yet. Use <strong>Attach result file(s)</strong> on an instruction — you can add several files.</p>`;
   }
 
   return `
@@ -262,12 +270,16 @@ function renderArtifactList(
           const busy = uploadingId === a.id;
           const statusLabel =
             a.syncStatus === 'published'
-              ? 'On server'
+              ? a.visibility === 'community'
+                ? 'On server · shared'
+                : 'On server · private'
               : a.syncStatus === 'local'
                 ? 'On this device only'
                 : a.syncStatus === 'uploading'
                   ? 'Sending…'
                   : 'Error';
+          const canEditShare = a.syncStatus === 'local' || a.syncStatus === 'error';
+          const instructionTitle = instructionTitleFor(instructions, a.instructionId);
           return `
         <li class="instruction-item">
           <div class="instruction-head">
@@ -275,10 +287,20 @@ function renderArtifactList(
             <span class="badge">${escapeHtml(statusLabel)}</span>
           </div>
           <p class="instruction-meta">
-            <span>SHA-256: ${escapeHtml(a.sha256.slice(0, 12))}…</span>
+            <span>For: ${escapeHtml(instructionTitle)}</span>
             <span>${formatBytes(a.sizeBytes)}</span>
           </p>
           ${a.errorMessage ? `<p class="instruction-desc">${escapeHtml(a.errorMessage)}</p>` : ''}
+          ${
+            canEditShare
+              ? `<label class="checkbox artifact-share">
+            <input type="checkbox" data-artifact-visibility="${escapeHtml(a.id)}" ${a.visibility === 'community' ? 'checked' : ''} />
+            Share with team when uploaded
+          </label>`
+              : a.syncStatus === 'published'
+                ? `<p class="instruction-desc muted">${a.visibility === 'community' ? 'Visible to teammates.' : 'Only you can see this on the server.'}</p>`
+                : ''
+          }
           <div class="instruction-actions">
             <button type="button" class="secondary compact" data-upload-artifact="${escapeHtml(a.id)}" ${a.syncStatus === 'published' || busy ? 'disabled' : ''}>
               ${busy ? 'Sending…' : 'Send to server'}
@@ -389,12 +411,8 @@ async function onDownloadInstruction(
   renderApp(controller.root, controller.config, controller.getState());
 }
 
-async function onRegisterArtifact(
-  instructionId: string,
-  file: File,
-  visibility: 'private' | 'community',
-): Promise<void> {
-  if (!controller) return;
+async function onRegisterArtifacts(instructionId: string, files: File[]): Promise<void> {
+  if (!controller || files.length === 0) return;
   controller.setState({
     registeringInstructionId: instructionId,
     error: null,
@@ -403,17 +421,20 @@ async function onRegisterArtifact(
   renderApp(controller.root, controller.config, controller.getState());
 
   try {
-    await registerArtifactFromFile(instructionId, file, visibility);
+    for (const file of files) {
+      await registerArtifactFromFile(instructionId, file, 'private');
+    }
     const artifacts = await refreshArtifactList();
-    const shareNote =
-      visibility === 'community'
-        ? 'It will be visible to teammates after Send to server.'
-        : 'It stays private on the server until you share a community upload later.';
+    const count = files.length;
+    const names =
+      count === 1
+        ? `“${files[0].name}”`
+        : `${count} files (${files.map((f) => f.name).join(', ')})`;
     controller.setState({
       artifacts,
       registeringInstructionId: null,
       error: null,
-      notice: `Attached “${file.name}”. See Your result files below, then tap Send to server. ${shareNote}`,
+      notice: `Attached ${names}. Set Share with team for each file below, then Send to server.`,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Could not attach file.';
@@ -425,6 +446,22 @@ async function onRegisterArtifact(
   }
   renderApp(controller.root, controller.config, controller.getState());
   document.getElementById('artifacts-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function onArtifactVisibilityChange(
+  artifactId: string,
+  visibility: 'private' | 'community',
+): Promise<void> {
+  if (!controller) return;
+  const result = await setArtifactVisibility(artifactId, visibility);
+  if (!result.ok) {
+    controller.setState({ error: result.message });
+    renderApp(controller.root, controller.config, controller.getState());
+    return;
+  }
+  const artifacts = await refreshArtifactList();
+  controller.setState({ artifacts, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
 }
 
 async function onUploadArtifact(config: KivaConfig, artifactId: string): Promise<void> {

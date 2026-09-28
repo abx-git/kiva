@@ -33,9 +33,9 @@ You do **not** edit instructions inside Kiva. You use **your normal apps** (PDF 
 | **Sync from server** | Fetches the latest **published instruction list** from the database and merges it with what is already saved on this device. Does **not** download file bytes unless you tap **Save offline**. Use after an admin publishes new instructions or new versions. |
 | **Save offline** | Downloads the instruction file from Storage into **IndexedDB** in this browser. Needed for offline reading inside Kiva and before **Export to device**. |
 | **Export to device** | Takes the offline copy and triggers a **browser download** so you can open it in another app. Disabled until **Save offline** has run at least once. |
-| **Attach result file** | You pick a file from your device; Kiva stores it locally and links it to the instruction (checksum recorded). Tap the label directly (required on some tablets — do not use a separate hidden picker). |
-| **Share with team when uploaded** | **Off (default):** after **Send to server**, only you can see the result in Supabase. **On:** teammates signed into Kiva can see it too (`visibility = community`). |
-| **Send to server** | Uploads an attached result file to the `artifacts` bucket and creates the database row. |
+| **Attach result file(s)** | Pick one or many files; each becomes its own row under **Your result files** (same instruction). Tap the label directly on tablets. |
+| **Share with team when uploaded** | **Per file**, in **Your result files** (not on the instruction row). Off = private on server; on = teammates can see after upload. Default for new files: off. |
+| **Send to server** | Uploads one attached file. Repeat for each row, or attach many first and upload one by one. |
 
 ### Status badges on an instruction
 

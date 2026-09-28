@@ -109,6 +109,24 @@ export async function refreshArtifactList(): Promise<LocalArtifactRecord[]> {
   return listAllArtifacts();
 }
 
+export async function setArtifactVisibility(
+  artifactId: string,
+  visibility: 'private' | 'community',
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const meta = await getArtifact(artifactId);
+  if (!meta) {
+    return { ok: false, message: 'File not found.' };
+  }
+  if (meta.syncStatus === 'uploading') {
+    return { ok: false, message: 'Wait until the current upload finishes.' };
+  }
+  if (meta.syncStatus === 'published') {
+    return { ok: false, message: 'Already on server — visibility cannot be changed here.' };
+  }
+  await saveArtifact({ ...meta, visibility });
+  return { ok: true };
+}
+
 function mapStorageSetupError(message: string): string {
   if (/bucket not found/i.test(message)) {
     return (

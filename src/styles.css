@@ -347,6 +347,11 @@ button.compact {
   line-height: 1.45;
 }
 
+.artifact-share {
+  flex: 1 1 100%;
+  margin: 0.25rem 0 0;
+}
+
 .file-attach-btn {
   position: relative;
   display: inline-flex;
