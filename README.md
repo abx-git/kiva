@@ -51,6 +51,25 @@ Table reference (same content split): [supabase/kiva/schema.sql](./supabase/kiva
 
 Ohne SQL-Setup siehst du in Supabase **keine Tabellen** — das ist normal, bis du `setup.sql` ausführst. **Anmelden** geht trotzdem, wenn unter **Authentication → Users** ein Nutzer existiert. **Instruktionen laden** erst nach Tabellen + optional Datei im Storage-Bucket `instructions`.
 
+### Cloud Agent: SQL automatisch ausführen lassen
+
+Der Browser-Key (`VITE_SUPABASE_ANON_KEY`) darf **kein DDL** ausführen. Damit der Agent `setup.sql` per Shell anwenden kann, brauchst du eine **Postgres-Verbindung** als Secret:
+
+1. **Supabase** → **Project Settings** → **Database** → **Connection string** → **URI** (Direct connection).
+2. Ersetze `[YOUR-PASSWORD]` durch das Datenbank-Passwort (nicht der anon key).
+3. In **Cursor** → **Dashboard** → **Cloud Agents** → deine **Environment** (Personal/Team für `abx-git/kiva`) → **Secrets**:
+   - `VITE_SUPABASE_URL` und `VITE_SUPABASE_ANON_KEY` (für die App, hast du vermutlich schon)
+   - **`SUPABASE_DB_URL`** = die URI aus Schritt 1
+4. Neuen Agent starten (Secrets gelten für neue Runs). Der Agent kann dann ausführen:
+
+   ```bash
+   npm run db:setup
+   ```
+
+**Sicherheit:** `SUPABASE_DB_URL` niemals ins Git committen, nicht als `VITE_*` prefixen (würde ins Frontend-Build leaken). Optional nur read-only Secrets für Produktion — für Setup reicht ein separates Dev-Projekt.
+
+**Alternative ohne DB-URL:** Supabase CLI mit Personal Access Token (`SUPABASE_ACCESS_TOKEN`) und `supabase link` — im Repo ist der Weg über `npm run db:setup` + `SUPABASE_DB_URL` vorgesehen.
+
 ## Architecture (short)
 
 - **E2/ET2:** browser app + local engine + optional remote adapter (no custom backend).
