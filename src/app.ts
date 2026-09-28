@@ -72,8 +72,6 @@ function bindEvents(root: HTMLElement, config: KivaConfig, state: AppState): voi
     return;
   }
 
-  root.querySelector('#reload-artifacts')?.addEventListener('click', () => void reloadArtifacts(config));
-
   root.querySelectorAll<HTMLButtonElement>('[data-download-id]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.downloadId;
@@ -147,13 +145,13 @@ function renderLogin(loading: boolean): string {
   return `
     <section class="card">
       <h2>Sign in</h2>
-      <p class="section-lead">Team instructions and result files in two tables: <strong>Shared</strong> and <strong>Private</strong>.</p>
+      <p class="section-lead">Instructions, shared files, and private files.</p>
       <form id="login-form">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required ${loading ? 'disabled' : ''} />
         <label for="password">Password</label>
         <input id="password" name="password" type="password" autocomplete="current-password" required ${loading ? 'disabled' : ''} />
-        <button type="submit" ${loading ? 'disabled' : ''}>${loading ? 'Signing in…' : 'Sign in'}</button>
+        <button type="submit" class="primary-block" ${loading ? 'disabled' : ''}>${loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </section>
   `;
@@ -167,31 +165,32 @@ function renderHome(state: AppState): string {
   );
 
   return `
-    <section class="card card-session">
-      <div class="instruction-head">
-        <h2>Instructions</h2>
-        <button type="button" class="secondary compact" id="logout">Sign out</button>
-      </div>
-      <p class="session-line">${escapeHtml(state.session?.user.email ?? '')}</p>
+    <div class="layout-stack">
+    <section class="card panel">
+      <header class="panel-header">
+        <div>
+          <h2 class="panel-title">Instructions</h2>
+          <p class="panel-sub">${escapeHtml(state.session?.user.email ?? '')}</p>
+        </div>
+        <button type="button" class="action" id="logout">Sign out</button>
+      </header>
       ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId, state.registeringInstructionId)}
     </section>
 
-    <section class="card">
-      <div class="instruction-head">
-        <h2>Shared</h2>
-        <button type="button" class="secondary compact" id="reload-artifacts" ${state.artifactsLoading ? 'disabled' : ''}>
-          ${state.artifactsLoading ? '…' : 'Refresh'}
-        </button>
-      </div>
-      <p class="section-lead">Your shared files and teammates’ shared files. Use <strong>Move to private</strong> on your own rows.</p>
-      ${renderServerTable(shared, state.instructions, userId, state.actingArtifactId)}
+    <section class="card panel">
+      <header class="panel-header">
+        <h2 class="panel-title">Shared</h2>
+      </header>
+      ${renderSharedList(shared, state.instructions, userId, state.actingArtifactId)}
     </section>
 
-    <section class="card">
-      <h2>Private</h2>
-      <p class="section-lead">Only you. Drafts waiting for upload appear here too. Use <strong>Move to shared</strong> after upload.</p>
-      ${renderPrivateTable(privateServer, state.drafts, state.instructions, userId, state.actingArtifactId)}
+    <section class="card panel">
+      <header class="panel-header">
+        <h2 class="panel-title">Private</h2>
+      </header>
+      ${renderPrivateList(privateServer, state.drafts, state.instructions, state.actingArtifactId)}
     </section>
+    </div>
   `;
 }
 
@@ -213,16 +212,18 @@ function renderInstructionList(
           const busy = downloadingId === item.id;
           return `
         <li class="instruction-item">
-          <h3 class="instruction-title">${escapeHtml(item.title)}</h3>
-          <div class="instruction-actions">
-            <button type="button" class="secondary compact" data-download-id="${escapeHtml(item.id)}" data-storage-path="${escapeHtml(item.storagePath)}" ${busy ? 'disabled' : ''}>
-              ${busy ? '…' : item.isCached ? 'Re-download' : 'Download'}
-            </button>
-            <button type="button" class="secondary compact" data-open-id="${escapeHtml(item.id)}" ${item.isCached ? '' : 'disabled'}>Open file</button>
-            <label class="file-attach-btn secondary compact">
-              ${registeringInstructionId === item.id ? '…' : 'Add results'}
-              <input type="file" multiple data-file-input="${escapeHtml(item.id)}" ${registeringInstructionId === item.id ? 'disabled' : ''} />
-            </label>
+          <div class="row-main">
+            <h3 class="row-title">${escapeHtml(item.title)}</h3>
+            <div class="action-group">
+              ${actionButton(busy ? '…' : item.isCached ? 'Re-download' : 'Download', `data-download-id="${escapeHtml(item.id)}" data-storage-path="${escapeHtml(item.storagePath)}"`, busy)}
+              ${actionSep()}
+              ${actionButton('Open', `data-open-id="${escapeHtml(item.id)}"`, !item.isCached)}
+              ${actionSep()}
+              <label class="action action-file">
+                ${registeringInstructionId === item.id ? '…' : 'Add results'}
+                <input type="file" multiple data-file-input="${escapeHtml(item.id)}" ${registeringInstructionId === item.id ? 'disabled' : ''} />
+              </label>
+            </div>
           </div>
         </li>`;
         })
@@ -235,96 +236,93 @@ function instructionTitle(instructions: InstructionListItem[], instructionId: st
   return instructions.find((i) => i.id === instructionId)?.title ?? '—';
 }
 
-function renderServerTable(
+function actionButton(label: string, attrs: string, disabled = false, danger = false): string {
+  return `<button type="button" class="action${danger ? ' action-danger' : ''}" ${attrs}${disabled ? ' disabled' : ''}>${escapeHtml(label)}</button>`;
+}
+
+function actionSep(): string {
+  return `<span class="action-sep" aria-hidden="true">·</span>`;
+}
+
+function renderArtifactRow(
+  fileName: string,
+  meta: string,
+  actionsHtml: string,
+): string {
+  return `
+    <article class="artifact-row">
+      <div class="row-main">
+        <p class="row-title">${escapeHtml(fileName)}</p>
+        <p class="row-meta">${escapeHtml(meta)}</p>
+      </div>
+      <div class="action-group">${actionsHtml}</div>
+    </article>`;
+}
+
+function renderSharedList(
   rows: ServerArtifactRow[],
   instructions: InstructionListItem[],
   userId: string,
   actingId: string | null,
 ): string {
-  if (rows.length === 0) {
-    return `<p class="muted">No shared files yet.</p>`;
-  }
+  if (rows.length === 0) return `<p class="empty">No shared files.</p>`;
 
-  return `
-    <table class="data-table">
-      <thead>
-        <tr><th>File</th><th>Instruction</th><th>Owner</th><th>Actions</th></tr>
-      </thead>
-      <tbody>
-        ${rows
-          .map((row) => {
-            const own = row.ownerId === userId;
-            const busy = actingId === row.id;
-            return `
-          <tr>
-            <td>${escapeHtml(row.fileName)}</td>
-            <td>${escapeHtml(instructionTitle(instructions, row.instructionId))}</td>
-            <td>${own ? 'You' : 'Teammate'}</td>
-            <td class="table-actions">
-              <button type="button" class="secondary compact" data-download-server="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Download</button>
-              ${own ? `<button type="button" class="secondary compact" data-move-private="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Move to private</button>` : ''}
-              ${own ? `<button type="button" class="secondary compact" data-delete-server="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Delete</button>` : ''}
-            </td>
-          </tr>`;
-          })
-          .join('')}
-      </tbody>
-    </table>
-  `;
+  return `<div class="artifact-list">${rows
+    .map((row) => {
+      const own = row.ownerId === userId;
+      const busy = actingId === row.id;
+      const meta = `${instructionTitle(instructions, row.instructionId)} · ${own ? 'You' : 'Teammate'}`;
+      const actions = [
+        actionButton('Download', `data-download-server="${escapeHtml(row.id)}"`, busy),
+        own ? actionSep() : '',
+        own ? actionButton('Make private', `data-move-private="${escapeHtml(row.id)}"`, busy) : '',
+        own ? actionSep() : '',
+        own ? actionButton('Delete', `data-delete-server="${escapeHtml(row.id)}"`, busy, true) : '',
+      ].join('');
+      return renderArtifactRow(row.fileName, meta, actions);
+    })
+    .join('')}</div>`;
 }
 
-function renderPrivateTable(
+function renderPrivateList(
   serverRows: ServerArtifactRow[],
   drafts: LocalArtifactRecord[],
   instructions: InstructionListItem[],
-  userId: string,
   actingId: string | null,
 ): string {
   if (serverRows.length === 0 && drafts.length === 0) {
-    return `<p class="muted">No private files. Add results on an instruction above.</p>`;
+    return `<p class="empty">No private files.</p>`;
   }
 
-  const draftRows = drafts
+  const draftHtml = drafts
     .map((d) => {
       const busy = actingId === d.id;
-      return `
-      <tr>
-        <td>${escapeHtml(d.fileName)}</td>
-        <td>${escapeHtml(instructionTitle(instructions, d.instructionId))}</td>
-        <td>Draft</td>
-        <td class="table-actions">
-          <button type="button" class="secondary compact" data-upload-draft="${escapeHtml(d.id)}" ${busy ? 'disabled' : ''}>Upload</button>
-          <button type="button" class="secondary compact" data-delete-draft="${escapeHtml(d.id)}" ${busy ? 'disabled' : ''}>Delete</button>
-        </td>
-      </tr>`;
+      const meta = `${instructionTitle(instructions, d.instructionId)} · Draft`;
+      const actions = [
+        actionButton('Upload', `data-upload-draft="${escapeHtml(d.id)}"`, busy),
+        actionSep(),
+        actionButton('Delete', `data-delete-draft="${escapeHtml(d.id)}"`, busy, true),
+      ].join('');
+      return renderArtifactRow(d.fileName, meta, actions);
     })
     .join('');
 
   const serverHtml = serverRows
     .map((row) => {
       const busy = actingId === row.id;
-      return `
-      <tr>
-        <td>${escapeHtml(row.fileName)}</td>
-        <td>${escapeHtml(instructionTitle(instructions, row.instructionId))}</td>
-        <td>You</td>
-        <td class="table-actions">
-          <button type="button" class="secondary compact" data-download-server="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Download</button>
-          <button type="button" class="secondary compact" data-move-shared="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Move to shared</button>
-          <button type="button" class="secondary compact" data-delete-server="${escapeHtml(row.id)}" ${busy ? 'disabled' : ''}>Delete</button>
-        </td>
-      </tr>`;
+      const meta = `${instructionTitle(instructions, row.instructionId)} · Private`;
+      const actions = [
+        actionButton('Download', `data-download-server="${escapeHtml(row.id)}"`, busy),
+        actionSep(),
+        actionButton('Make shared', `data-move-shared="${escapeHtml(row.id)}"`, busy),
+        actionSep(),
+        actionButton('Delete', `data-delete-server="${escapeHtml(row.id)}"`, busy, true),
+      ].join('');
+      return renderArtifactRow(row.fileName, meta, actions);
     })
     .join('');
 
-  return `
-    <table class="data-table">
-      <thead>
-        <tr><th>File</th><th>Instruction</th><th>Status</th><th>Actions</th></tr>
-      </thead>
-      <tbody>${draftRows}${serverHtml}</tbody>
-    </table>
-  `;
+  return `<div class="artifact-list">${draftHtml}${serverHtml}</div>`;
 }
 
 function escapeHtml(text: string): string {

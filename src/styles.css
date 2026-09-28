@@ -24,17 +24,23 @@ body {
 }
 
 #app {
-  max-width: 36rem;
+  max-width: 42rem;
   margin: 0 auto;
-  padding: max(1.25rem, env(safe-area-inset-top)) max(1.25rem, env(safe-area-inset-right))
-    max(3rem, env(safe-area-inset-bottom)) max(1.25rem, env(safe-area-inset-left));
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(2.5rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+}
+
+.layout-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
 }
 
 .brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-bottom: 2rem;
+  margin-bottom: 1.25rem;
 }
 
 .brand img {
@@ -105,7 +111,31 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1.25rem;
+  padding: 1rem 1.1rem;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.panel-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.panel-sub {
+  margin: 0.2rem 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+  word-break: break-all;
 }
 
 .card h2 {
@@ -118,6 +148,12 @@ body {
   font-size: 0.9rem;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--muted);
 }
 
 label {
@@ -144,28 +180,80 @@ input:focus {
 }
 
 button {
-  width: 100%;
-  padding: 0.65rem 1rem;
+  font: inherit;
+  cursor: pointer;
   border: none;
+  background: none;
+  color: inherit;
+  padding: 0;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+button.primary-block {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.7rem 1rem;
   border-radius: 8px;
   font-size: 1rem;
   font-weight: 600;
-  cursor: pointer;
   background: var(--accent);
   color: #0f1419;
 }
 
-button.secondary,
-.file-attach-btn.secondary {
-  background: transparent;
-  color: var(--text);
-  border: 1px solid var(--border);
-  margin-top: 0.5rem;
+.action {
+  display: inline;
+  padding: 0.15rem 0;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--accent-dim);
+  line-height: 1.4;
 }
 
-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.action:hover:not(:disabled) {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.action-danger {
+  color: #f0a8a8;
+}
+
+.action-danger:hover:not(:disabled) {
+  color: var(--danger);
+}
+
+.action-file {
+  position: relative;
+  display: inline;
+  cursor: pointer;
+}
+
+.action-file input[type='file'] {
+  position: absolute;
+  width: 0.1px;
+  height: 0.1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
+
+.action-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.action-sep {
+  color: var(--border);
+  font-size: 0.75rem;
+  user-select: none;
 }
 
 .alert {
@@ -240,21 +328,8 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-.toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-button.compact {
-  width: auto;
-  min-height: 2.75rem;
-  padding: 0.55rem 1rem;
-  font-size: 0.95rem;
-}
-
 .card-session {
-  margin-bottom: 1rem;
+  margin-bottom: 0;
 }
 
 .instruction-list {
@@ -264,13 +339,64 @@ button.compact {
 }
 
 .instruction-item {
-  padding: 1rem 0;
+  padding: 0.75rem 0;
   border-top: 1px solid var(--border);
 }
 
 .instruction-item:first-child {
   border-top: none;
   padding-top: 0;
+}
+
+.row-main {
+  min-width: 0;
+}
+
+.row-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.row-meta {
+  margin: 0.15rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.artifact-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.artifact-row {
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border);
+}
+
+.artifact-row:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+@media (min-width: 520px) {
+  .artifact-row,
+  .instruction-item .row-main {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    column-gap: 1rem;
+  }
+
+  .artifact-row .action-group,
+  .instruction-item .action-group {
+    margin-top: 0;
+    justify-content: flex-end;
+    text-align: right;
+  }
 }
 
 .instruction-head {
@@ -286,10 +412,6 @@ button.compact {
   flex: 1 1 auto;
 }
 
-.instruction-title {
-  margin: 0 0 0.65rem;
-  font-size: 1.05rem;
-}
 
 .pending-uploads {
   list-style: none;
@@ -326,35 +448,6 @@ button.compact {
   font-size: 0.85rem;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.88rem;
-}
-
-.data-table th,
-.data-table td {
-  text-align: left;
-  padding: 0.55rem 0.35rem;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-
-.data-table th {
-  color: var(--muted);
-  font-weight: 600;
-  font-size: 0.78rem;
-}
-
-.table-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-}
-
-.table-actions button.compact {
-  margin-top: 0;
-}
 
 .badge {
   font-size: 0.7rem;
@@ -391,56 +484,6 @@ button.compact {
   color: var(--muted);
 }
 
-.instruction-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.65rem;
-}
-
-.instruction-actions button.compact {
-  flex: 1 1 8.5rem;
-}
-
-.register-row {
-  margin-top: 0.65rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.5rem 0.75rem;
-}
-
-.share-hint {
-  flex: 1 1 100%;
-  margin: 0;
-  font-size: 0.82rem;
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.artifact-share {
-  flex: 1 1 100%;
-  margin: 0.25rem 0 0;
-}
-
-.file-attach-btn {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 2.75rem;
-  margin: 0;
-  cursor: pointer;
-}
-
-.file-attach-btn input[type='file'] {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  font-size: 1rem;
-}
 
 .checkbox {
   display: flex;
@@ -461,23 +504,18 @@ button.compact {
 }
 
 @media (pointer: coarse) {
-  input {
-    min-height: 3rem;
+  input:not([type='file']) {
+    min-height: 2.75rem;
     font-size: 1.05rem;
   }
 
-  button {
-    min-height: 3rem;
+  button.primary-block {
+    min-height: 2.85rem;
   }
 
-  button.compact {
-    min-height: 3rem;
-    font-size: 1rem;
-  }
-
-  .register-row button.compact {
-    width: 100%;
-    flex: 1 1 100%;
+  .action {
+    font-size: 0.95rem;
+    padding: 0.35rem 0.15rem;
   }
 }
 
