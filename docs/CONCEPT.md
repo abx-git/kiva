@@ -1,105 +1,100 @@
 # Kiva — Concept
 
-**As of:** 2026-09-28  
-**Status:** Concept + MVP (sign-in, PWA, adapter layer)
+**Updated:** 2026-09-28
 
-## Vision
+## What Kiva is
 
-Kiva is an **installable web app (PWA)** where authorized users **fetch work instructions** from a central platform, **produce results locally** with any desktop software, **register those results in Kiva**, and **upload them** so other Kiva users can use them.
+Kiva is a **PWA** that connects a **central instruction library** (Supabase) with **work you do on your own device**.
 
-## Architecture (E2 / ET2)
+You do **not** edit instructions inside Kiva. You use **your normal apps** (PDF reader, CAD, Office, DAW, …). Kiva **tracks** which instruction you followed and **carries result files back** to the server when you upload them.
 
-Alongside [E2](https://github.com/abx-git/E2) and the local **Encrypted Vault** (`vault/`), **ET2** here means:
+## What Kiva is not
 
-| Layer | Role |
-|--------|--------|
-| **Browser app (thin client)** | UI, session, orchestration — no business logic on a custom server |
-| **Local engine** | IndexedDB, cache, optional File System Access API — data stays under user control |
-| **Remote adapter (optional)** | Supabase: auth, metadata (Postgres), files (Storage) — when online with a valid session |
+- Not a file manager or document editor.
+- Not a replacement for opening files in the OS — Kiva **stores a copy in the browser** and can **export** it when you need a file on disk.
+- Not offline upload — sending results to the server requires network.
+
+## The workflow (matches the UI)
 
 ```text
-┌─────────────────────────────────────────────────────────┐
-│                    Kiva PWA (Browser)                    │
-│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────┐ │
-│  │ UI / Router │  │ Local engine │  │ Remote adapter  │ │
-│  │ Sign-in, …  │  │ IndexedDB    │  │ Supabase Auth   │ │
-│  │             │  │ SW cache     │  │ DB + Storage    │ │
-│  └──────┬──────┘  └───────┬──────┘  └────────┬────────┘ │
-│         └─────────────────┴──────────────────┘          │
-└─────────────────────────────────────────────────────────┘
-          │                              │
-          ▼                              ▼
-   Local files (OS)                 Supabase (central)
-   DAW, CAD, Office, …              Instructions, artifacts
+1. Sign in
+2. Sync from server     → refresh the instruction list from Supabase
+3. Save offline         → copy instruction file into Kiva (browser storage)
+4. Export to device     → save that copy to Downloads / Files so other apps can open it
+5. (Work in your apps)
+6. Attach result file   → link a finished file to that instruction in Kiva
+7. Send to server       → upload that result to Supabase Storage
 ```
 
-**Offline-first for reading:** Downloaded instructions and registered metadata are available locally. **Publishing to the community** requires network and authentication.
+### What each button does
 
-## Domain model (target)
+| UI label | Meaning |
+|----------|---------|
+| **Sync from server** | Fetches the latest **published instruction list** from the database and merges it with what is already saved on this device. Does **not** download file bytes unless you tap **Save offline**. Use after an admin publishes new instructions or new versions. |
+| **Save offline** | Downloads the instruction file from Storage into **IndexedDB** in this browser. Needed for offline reading inside Kiva and before **Export to device**. |
+| **Export to device** | Takes the offline copy and triggers a **browser download** so you can open it in another app. Disabled until **Save offline** has run at least once. |
+| **Attach result file** | You pick a file from your device; Kiva stores it locally and links it to the instruction (checksum recorded). |
+| **Send to server** | Uploads an attached result file to the `artifacts` bucket and creates the database row. |
+
+### Status badges on an instruction
+
+| Badge | Meaning |
+|-------|---------|
+| **Saved in app** | File bytes are in this browser; export and offline use possible. |
+| **Server only** | You see the catalog entry but have not saved the file on this device yet. |
+
+## Roles
+
+| Role | Kiva |
+|------|------|
+| **Central platform** | Supabase Auth, Postgres (`instructions`, `artifacts`), Storage buckets `instructions` + `artifacts`. |
+| **This device** | IndexedDB cache, local result files before upload, PWA shell (service worker). |
+| **Your tools** | Any software that opens the exported instruction file and produces a result file you attach in Kiva. |
+
+## Architecture (short)
+
+```text
+┌──────────────────────────────────────────┐
+│ Kiva PWA                                  │
+│  UI  ·  IndexedDB (offline copies)        │
+│         ·  Supabase client when online    │
+└──────────────────────────────────────────┘
+         │                    │
+         ▼                    ▼
+   OS apps (export)     Supabase (catalog + uploads)
+```
+
+- **Thin client:** no custom backend; auth and data via Supabase.
+- **Offline-first for reading:** saved instructions and attached results (pre-upload) live locally.
+- **Online for sync and upload:** list sync and server upload need a session and network.
+
+## Data model
 
 | Entity | Description |
-|---------|----------------|
-| **User** | Identity via Supabase Auth (`auth.users`) |
-| **Instruction** | Versioned package: metadata + files (PDF, ZIP, …) in Storage |
-| **Artifact registration** | Local record: file linked to instruction, hash, sync status |
-| **Publication** | Upload to Storage + metadata for other users |
+|--------|-------------|
+| **Instruction** | Published catalog row + file in Storage (`instructions` bucket). |
+| **Artifact** | Your result file linked to an instruction; local until uploaded, then in `artifacts` bucket. |
 
-### Golden path
+## Security (operators)
 
-1. **Sign in** — email/password (or magic link) via Supabase.
-2. **Instructions** — list from DB, download to local cache / optional disk export.
-3. **Work locally** — external tools; Kiva keeps references and metadata only.
-4. **Register** — pick file(s), link to instruction, compute checksum.
-5. **Upload** — blob to Storage, row in `artifacts`, visibility private or community.
-6. **Share** — other users see published artifacts and can download.
+- JWT auth via Supabase; RLS on tables; Storage paths scoped by user id for artifacts.
+- App env: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (never commit secrets).
 
-## Security & privacy
+## Setup (operators)
 
-- **Auth:** JWT via Supabase; refresh in the browser; no custom password storage in Kiva.
-- **RLS:** row level security on tables — own drafts writable, published artifacts readable per policy.
-- **Storage:** bucket policies; paths include `user_id` / `artifact_id`.
-- **CSP:** strict policy in production; `connect-src` limited to the Supabase project URL.
+1. Run `supabase/kiva/setup.sql` once (tables + buckets + policies).
+2. Create users in **Authentication → Users** (preferred over raw SQL).
+3. Publish instructions in DB + upload files to Storage.
 
-## Stack
+See [README.md](../README.md) for deploy and troubleshooting.
 
-| Area | Choice | Rationale |
-|---------|------|------------|
-| Build | Vite 7 + TypeScript | Same pattern as `vault/` |
-| Hosting | Static under `/kiva/` on x-be.de | GitHub Pages |
-| Auth & backend | Supabase | DB, Storage, Auth |
-| PWA | `manifest.webmanifest` + service worker | Installable, offline app shell |
-| Local state | IndexedDB (native) | Structured cache metadata |
+## Roadmap
 
-## Layout
+| Phase | Scope |
+|-------|--------|
+| **Done** | Sign-in, instruction list, offline save, export, attach + upload results |
+| **Next** | Browse and download **other users’** shared results |
 
-```text
-kiva/                 # SPA source
-docs/kiva/            # Concept & progress
-supabase/kiva/        # SQL schema (backend reference)
-```
+## Relation to E2
 
-## Phases
-
-| Phase | Scope | Status |
-|-------|--------|--------|
-| **0** | Concept, docs, repo skeleton, PWA shell | Done |
-| **1** | Sign-in + session + home | MVP |
-| **2** | Instructions: list, download, offline cache | MVP done |
-| **3** | Register artifact (local) + upload | MVP done |
-| **4** | Community browse, search, orgs | Planned |
-
-## Supabase setup (operators)
-
-1. Create a Supabase project.
-2. Run `supabase/kiva/schema.sql` in the SQL editor.
-3. Create Storage buckets `instructions` and `artifacts` (see `storage.sql`).
-4. Set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in `kiva/.env` or CI secrets.
-
-Without those variables, Kiva runs in **demo mode** (banner in the UI, no real sign-in).
-
-## Relation to E2 Board
-
-- **E2** provides **domain model context** (`.storm.json`) for agents.
-- **Kiva** provides **operational workflows** (instructions ↔ artifacts) with central sharing.
-
-Linking an instruction to an E2 snapshot may come later; it is out of scope for phases 0–3.
+[E2](https://github.com/abx-git/E2) is a separate domain/agent context. Kiva is the **operational** instruction ↔ result workflow. Deep linking to E2 may come later.

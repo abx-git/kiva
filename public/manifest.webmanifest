@@ -1,7 +1,7 @@
 {
   "name": "Kiva",
   "short_name": "Kiva",
-  "description": "View instructions, work locally, share results.",
+  "description": "Sync instructions, export to your apps, upload result files.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

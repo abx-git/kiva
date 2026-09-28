@@ -1,13 +1,13 @@
--- Beispiel: eine veröffentlichte Instruktion (nach Upload einer Datei in Storage)
--- Datei z. B. unter Pfad: onboarding/willkommen.pdf
+-- Example: one published instruction (after uploading a file to Storage)
+-- e.g. path in bucket instructions: onboarding/welcome.pdf
 
 insert into public.instructions (slug, title, version, description, storage_path, published)
 values (
-  'willkommen',
-  'Willkommen bei Kiva',
+  'welcome',
+  'Welcome to Kiva',
   '1.0.0',
-  'Kurze Einführung in den Arbeitsablauf.',
-  'onboarding/willkommen.pdf',
+  'Short introduction to the workflow.',
+  'onboarding/welcome.pdf',
   true
 )
 on conflict (slug) do nothing;

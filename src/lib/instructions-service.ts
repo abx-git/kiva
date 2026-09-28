@@ -74,7 +74,10 @@ export async function openCachedInstruction(
 ): Promise<{ ok: true } | { ok: false; message: string }> {
   const record = await getInstructionBlob(instructionId);
   if (!record) {
-    return { ok: false, message: 'File is not available offline. Download it first.' };
+    return {
+      ok: false,
+      message: 'No offline copy yet. Tap Save offline on this instruction first, then Export to device.',
+    };
   }
 
   const url = URL.createObjectURL(record.blob);

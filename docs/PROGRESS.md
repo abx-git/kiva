@@ -4,6 +4,16 @@ Chronological implementation log. Newest entries first.
 
 ---
 
+## 2026-09-28 — Concept clarity (English UI)
+
+### Done
+
+- [x] Rewrote [CONCEPT.md](./CONCEPT.md): workflow-first, button glossary (**Sync from server**, **Save offline**, **Export to device**, etc.).
+- [x] In-app **How Kiva works** section on login and home; renamed all primary actions to match the concept.
+- [x] Explained **Sync from server** inline (list only, not file download).
+
+---
+
 ## 2026-09-28 — English UI
 
 ### Done

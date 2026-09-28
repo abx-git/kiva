@@ -40,7 +40,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
       <img src="${import.meta.env.BASE_URL}icon.svg" width="40" height="40" alt="" />
       <div>
         <h1>Kiva</h1>
-        <p class="tagline">Work locally · share centrally</p>
+        <p class="tagline">Instructions in. Results out. Work in your own apps.</p>
       </div>
     </header>
     ${!configured ? `<div class="alert warn" role="status">Supabase is not configured for this build. Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (local: <code>kiva/.env</code>; GitHub Pages: repository secrets) and redeploy.</div>` : ''}
@@ -114,11 +114,27 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
   logoutBtn?.addEventListener('click', () => void onLogout(config));
 }
 
-function renderLogin(configured: boolean, loading: boolean): string {
+function renderHowItWorks(): string {
   return `
+    <section class="card how-it-works" aria-labelledby="how-title">
+      <h2 id="how-title">How Kiva works</h2>
+      <p>Kiva is not where you edit files. It lists instructions from the server, keeps a copy in this browser, and sends your finished result files back.</p>
+      <ol class="step-list">
+        <li><strong>Sync from server</strong> — update the instruction list from Supabase.</li>
+        <li><strong>Save offline</strong> — store the instruction file inside Kiva on this device.</li>
+        <li><strong>Export to device</strong> — download that copy so PDF, CAD, or other apps can open it.</li>
+        <li>Work in your apps, then <strong>Attach result file</strong> and <strong>Send to server</strong>.</li>
+      </ol>
+    </section>
+  `;
+}
+
+function renderLogin(_configured: boolean, loading: boolean): string {
+  return `
+    ${renderHowItWorks()}
     <section class="card" aria-labelledby="login-title">
       <h2 id="login-title">Sign in</h2>
-      <p>Access the central Kiva database (Supabase). After sign-in you can load instructions and save them offline.</p>
+      <p>Use your team account. Editing happens in your own software after you export an instruction.</p>
       <form id="login-form">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required ${loading ? 'disabled' : ''} />
@@ -127,32 +143,32 @@ function renderLogin(configured: boolean, loading: boolean): string {
         <button type="submit" ${loading ? 'disabled' : ''}>${loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </section>
-    <details class="roadmap">
-      <summary>What can I do here?</summary>
-      <p class="roadmap-lead">After sign-in: load instructions, save them offline, upload your result files.</p>
-    </details>
   `;
 }
 
 function renderHome(state: AppState): string {
   const email = state.session?.user.email ?? 'Unknown';
   return `
+    ${renderHowItWorks()}
     <section class="card card-session" aria-labelledby="home-title">
-      <h2 id="home-title">Instructions</h2>
+      <h2 id="home-title">Instruction catalog</h2>
       <p class="session-line">Signed in as <span class="session-email">${escapeHtml(email)}</span></p>
+      <p class="help-line" id="sync-help"><strong>Sync from server</strong> reloads the published instruction list from Supabase. It does not download files — use <strong>Save offline</strong> on each item.</p>
       <div class="toolbar">
-        <button type="button" class="secondary compact" id="refresh-instructions" ${state.instructionsLoading ? 'disabled' : ''}>
-          ${state.instructionsLoading ? 'Refreshing…' : 'Refresh catalog'}
+        <button type="button" class="secondary compact" id="refresh-instructions" aria-describedby="sync-help" ${state.instructionsLoading ? 'disabled' : ''}>
+          ${state.instructionsLoading ? 'Syncing…' : 'Sync from server'}
         </button>
         <button type="button" class="secondary compact" id="logout">Sign out</button>
       </div>
     </section>
     <section class="card" aria-labelledby="list-title">
-      <h2 id="list-title" class="sr-only">List</h2>
+      <h2 id="list-title">Published instructions</h2>
+      <p class="section-lead">Each row is one instruction package on the server. Save it offline, export it to work elsewhere, then attach your result below.</p>
       ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId)}
     </section>
     <section class="card" aria-labelledby="artifacts-title">
-      <h2 id="artifacts-title">My artifacts</h2>
+      <h2 id="artifacts-title">Your result files</h2>
+      <p class="section-lead">Files you attached to an instruction. <strong>Send to server</strong> uploads them to the team storage.</p>
       ${renderArtifactList(state.artifacts, state.uploadingArtifactId, state.session?.user.id)}
     </section>
   `;
@@ -164,11 +180,11 @@ function renderInstructionList(
   downloadingId: string | null,
 ): string {
   if (loading && items.length === 0) {
-    return `<p class="muted">Loading instructions…</p>`;
+    return `<p class="muted">Loading instruction list…</p>`;
   }
 
   if (items.length === 0) {
-    return `<p class="muted">No instructions in the catalog yet. Publish rows in Supabase or refresh the list.</p>`;
+    return `<p class="muted">No published instructions yet. Ask an admin to publish in Supabase, then tap <strong>Sync from server</strong>.</p>`;
   }
 
   return `
@@ -183,7 +199,7 @@ function renderInstructionList(
           <div class="instruction-head">
             <h3>${escapeHtml(item.title)}</h3>
             <span class="badge">${escapeHtml(item.version)}</span>
-            ${item.isCached ? '<span class="badge badge-ok">Offline</span>' : '<span class="badge badge-muted">Online only</span>'}
+            ${item.isCached ? '<span class="badge badge-ok">Saved in app</span>' : '<span class="badge badge-muted">Server only</span>'}
           </div>
           ${item.description ? `<p class="instruction-desc">${escapeHtml(item.description)}</p>` : ''}
           <p class="instruction-meta">
@@ -197,21 +213,22 @@ function renderInstructionList(
               data-download-id="${escapeHtml(item.id)}"
               data-storage-path="${escapeHtml(item.storagePath)}"
               ${busy ? 'disabled' : ''}
-            >${busy ? 'Loading…' : item.isCached ? 'Download again' : 'Download'}</button>
+            >${busy ? 'Saving…' : item.isCached ? 'Update offline copy' : 'Save offline'}</button>
             <button
               type="button"
               class="secondary compact"
               data-open-id="${escapeHtml(item.id)}"
               ${item.isCached ? '' : 'disabled'}
-            >Open locally</button>
+              title="${item.isCached ? 'Download the saved copy to your device' : 'Save offline first'}"
+            >Export to device</button>
           </div>
           <div class="register-row">
             <label class="checkbox">
               <input type="checkbox" id="vis-${escapeHtml(item.id)}" />
-              Share with community
+              Share with team when uploaded
             </label>
             <input type="file" class="sr-only" id="file-${escapeHtml(item.id)}" data-file-input="${escapeHtml(item.id)}" />
-            <button type="button" class="secondary compact" data-register-id="${escapeHtml(item.id)}">Register result</button>
+            <button type="button" class="secondary compact" data-register-id="${escapeHtml(item.id)}">Attach result file</button>
           </div>
         </li>`;
         })
@@ -229,7 +246,7 @@ function renderArtifactList(
     return `<p class="muted">Not signed in.</p>`;
   }
   if (artifacts.length === 0) {
-    return `<p class="muted">No registered files yet. Use “Register result” on an instruction.</p>`;
+    return `<p class="muted">Nothing attached yet. After you finish work in another app, use <strong>Attach result file</strong> on the matching instruction.</p>`;
   }
 
   return `
@@ -239,11 +256,11 @@ function renderArtifactList(
           const busy = uploadingId === a.id;
           const statusLabel =
             a.syncStatus === 'published'
-              ? 'Published'
+              ? 'On server'
               : a.syncStatus === 'local'
-                ? 'Local only'
+                ? 'On this device only'
                 : a.syncStatus === 'uploading'
-                  ? 'Uploading…'
+                  ? 'Sending…'
                   : 'Error';
           return `
         <li class="instruction-item">
@@ -258,7 +275,7 @@ function renderArtifactList(
           ${a.errorMessage ? `<p class="instruction-desc">${escapeHtml(a.errorMessage)}</p>` : ''}
           <div class="instruction-actions">
             <button type="button" class="secondary compact" data-upload-artifact="${escapeHtml(a.id)}" ${a.syncStatus === 'published' || busy ? 'disabled' : ''}>
-              ${busy ? 'Uploading…' : 'Upload'}
+              ${busy ? 'Sending…' : 'Send to server'}
             </button>
           </div>
         </li>`;

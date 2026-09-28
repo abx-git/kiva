@@ -55,6 +55,52 @@ body {
   color: var(--muted);
 }
 
+.how-it-works {
+  margin-bottom: 1.25rem;
+}
+
+.how-it-works h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.05rem;
+}
+
+.how-it-works p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.step-list {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  color: var(--text);
+  line-height: 1.55;
+}
+
+.step-list li {
+  margin-bottom: 0.35rem;
+}
+
+.step-list strong {
+  font-weight: 600;
+}
+
+.help-line {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.section-lead {
+  margin: -0.25rem 0 1rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
