@@ -19,7 +19,6 @@ import {
   cacheInstructionFile,
   loadInstructionsView,
   openCachedInstruction,
-  syncInstructionsFromRemote,
 } from './lib/instructions-service';
 import type { InstructionListItem } from './lib/instructions-types';
 import type { AppState } from './types';
@@ -73,9 +72,6 @@ function bindEvents(root: HTMLElement, config: KivaConfig, state: AppState): voi
     return;
   }
 
-  root.querySelector('#refresh-instructions')?.addEventListener('click', () =>
-    void onRefreshInstructions(config),
-  );
   root.querySelector('#reload-artifacts')?.addEventListener('click', () => void reloadArtifacts(config));
 
   root.querySelectorAll<HTMLButtonElement>('[data-download-id]').forEach((btn) => {
@@ -177,9 +173,6 @@ function renderHome(state: AppState): string {
         <button type="button" class="secondary compact" id="logout">Sign out</button>
       </div>
       <p class="session-line">${escapeHtml(state.session?.user.email ?? '')}</p>
-      <button type="button" class="secondary compact" id="refresh-instructions" ${state.instructionsLoading ? 'disabled' : ''}>
-        ${state.instructionsLoading ? 'Syncing…' : 'Sync list'}
-      </button>
       ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId, state.registeringInstructionId)}
     </section>
 
@@ -209,7 +202,9 @@ function renderInstructionList(
   registeringInstructionId: string | null,
 ): string {
   if (loading && items.length === 0) return `<p class="muted">Loading…</p>`;
-  if (items.length === 0) return `<p class="muted">No instructions. Tap Sync list.</p>`;
+  if (items.length === 0) {
+    return `<p class="muted">No instructions yet. Reload the app after new ones are published.</p>`;
+  }
 
   return `
     <ul class="instruction-list">
@@ -410,19 +405,6 @@ export async function bootstrapHomeData(config: KivaConfig): Promise<void> {
       error: err instanceof Error ? err.message : 'Load failed.',
     });
   }
-  renderApp(controller.root, controller.config, controller.getState());
-}
-
-async function onRefreshInstructions(config: KivaConfig): Promise<void> {
-  if (!controller) return;
-  controller.setState({ instructionsLoading: true, error: null, notice: null });
-  renderApp(controller.root, controller.config, controller.getState());
-  const result = await syncInstructionsFromRemote(config);
-  controller.setState({
-    instructions: result.items,
-    instructionsLoading: false,
-    error: result.ok ? null : result.message,
-  });
   renderApp(controller.root, controller.config, controller.getState());
 }
 

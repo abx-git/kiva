@@ -23,7 +23,7 @@ Teammate rows in Shared: **Download** only.
 
 ### Instructions (top section)
 
-**Sync list**, **Download**, **Open file**, **Add results** — new files land as drafts in **Private**.
+Opening the app reloads the instruction list. Per instruction: **Download**, **Open file**, **Add results** (drafts → **Private**).
 
 ## Operators
 
