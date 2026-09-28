@@ -17,6 +17,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
     steps:
       - uses: actions/checkout@v4
 
@@ -33,21 +35,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Verify Supabase secrets for production build
-        env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: |
-          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
-            echo "::error::Set repository secrets VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (Supabase dashboard → Project Settings → API)."
-            exit 1
-          fi
-
       - name: Build Kiva PWA
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-        run: npm run build
+          VITE_SUPABASE_URL_SECRET: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY_SECRET: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_SUPABASE_URL_VAR: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY_VAR: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+        run: |
+          export VITE_SUPABASE_URL="${VITE_SUPABASE_URL_SECRET:-$VITE_SUPABASE_URL_VAR}"
+          export VITE_SUPABASE_ANON_KEY="${VITE_SUPABASE_ANON_KEY_SECRET:-$VITE_SUPABASE_ANON_KEY_VAR}"
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Supabase config missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY as repository or github-pages environment secrets (or as Actions variables with the same names)."
+            exit 1
+          fi
+          npm run build
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

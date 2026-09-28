@@ -1,0 +1,3 @@
+{
+  "install": "npm ci && node scripts/sync-dotenv-from-env.mjs"
+}

@@ -20,14 +20,18 @@ npm run build          # → dist/
 
 The workflow [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) builds on push to `main` and publishes `dist/` to GitHub Pages.
 
-Add these **repository secrets** (Settings → Secrets and variables → Actions) so sign-in works in production:
+Configure Supabase for production in **GitHub → Settings → Secrets and variables → Actions**:
 
-| Secret | Value |
-|--------|--------|
-| `VITE_SUPABASE_URL` | Project URL from Supabase (API settings) |
-| `VITE_SUPABASE_ANON_KEY` | `anon` / publishable key from Supabase |
+| Name | Kind | Value |
+|------|------|--------|
+| `VITE_SUPABASE_URL` | Secret or variable | Project URL (Supabase → Project Settings → API) |
+| `VITE_SUPABASE_ANON_KEY` | Secret or variable | `anon` / publishable key |
 
-Without them the build fails and the live app cannot authenticate.
+The deploy workflow runs the **build** job in the **`github-pages` environment**, so the same names also work under **Environments → github-pages → Environment secrets / variables** (not only repository-level).
+
+**Cursor Cloud Agent** secrets with the same names are used for development in the agent (`install` writes `kiva/.env` when missing). They are **not** sent to GitHub Pages automatically — GitHub Actions needs its own copy.
+
+Without GitHub config the deploy build fails; the live app cannot authenticate.
 
 ## Supabase
 
