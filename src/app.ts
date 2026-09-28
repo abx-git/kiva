@@ -21,6 +21,15 @@ import {
   openCachedInstruction,
 } from './lib/instructions-service';
 import type { InstructionListItem } from './lib/instructions-types';
+import { renderAdminPage } from './admin-ui';
+import {
+  createInstructionAsAdmin,
+  defaultStoragePath,
+  deleteInstructionAsAdmin,
+  listAllInstructionsForAdmin,
+  updateInstructionAsAdmin,
+} from './lib/instructions-admin';
+import { fetchIsAdmin } from './lib/profile';
 import type { AppState } from './types';
 
 export function createInitialState(session: Session | null): AppState {
@@ -38,6 +47,11 @@ export function createInitialState(session: Session | null): AppState {
     actingArtifactId: null,
     registeringInstructionId: null,
     notice: null,
+    isAdmin: false,
+    adminRows: [],
+    adminLoading: false,
+    adminSaving: false,
+    adminEditId: null,
   };
 }
 
@@ -55,7 +69,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
     ${!configured ? `<div class="alert warn" role="status">Supabase is not configured for this build.</div>` : ''}
     ${state.notice ? `<div class="alert ok" role="status">${escapeHtml(state.notice)}</div>` : ''}
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
-    ${state.view === 'login' ? renderLogin(state.loading) : renderHome(state)}
+    ${state.view === 'login' ? renderLogin(state.loading) : state.view === 'admin' ? renderAdminPage(state) : renderHome(state)}
   `;
 
   bindEvents(root, config, state);
@@ -69,6 +83,11 @@ function bindEvents(root: HTMLElement, config: KivaConfig, state: AppState): voi
       const fd = new FormData(form);
       void onLogin(config, String(fd.get('email') ?? '').trim(), String(fd.get('password') ?? ''));
     });
+    return;
+  }
+
+  if (state.view === 'admin') {
+    bindAdminEvents(root, config);
     return;
   }
 
@@ -139,6 +158,46 @@ function bindEvents(root: HTMLElement, config: KivaConfig, state: AppState): voi
   });
 
   root.querySelector('#logout')?.addEventListener('click', () => void onLogout(config));
+  root.querySelector('#go-admin')?.addEventListener('click', () => void openAdmin(config));
+}
+
+function bindAdminEvents(root: HTMLElement, config: KivaConfig): void {
+  root.querySelector('#admin-back')?.addEventListener('click', () => goHome());
+  root.querySelector('#admin-new')?.addEventListener('click', () => {
+    if (!controller) return;
+    controller.setState({ adminEditId: 'new', error: null });
+    renderApp(controller.root, controller.config, controller.getState());
+  });
+  root.querySelector('#admin-cancel')?.addEventListener('click', () => {
+    if (!controller) return;
+    controller.setState({ adminEditId: null });
+    renderApp(controller.root, controller.config, controller.getState());
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-admin-edit]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.adminEdit;
+      if (id && controller) {
+        controller.setState({ adminEditId: id, error: null });
+        renderApp(controller.root, controller.config, controller.getState());
+      }
+    });
+  });
+  root.querySelectorAll<HTMLButtonElement>('[data-admin-delete]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.adminDelete;
+      if (id) void onAdminDelete(config, id);
+    });
+  });
+  root.querySelector<HTMLFormElement>('#admin-form')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    void onAdminFormSubmit(config, e.currentTarget as HTMLFormElement);
+  });
+  root.querySelector<HTMLInputElement>('#admin-slug')?.addEventListener('input', syncAdminStoragePathFromSlug);
+  root.querySelector<HTMLInputElement>('#admin-file')?.addEventListener('change', syncAdminStoragePathFromFile);
+  root.querySelector<HTMLInputElement>('#admin-storage-path')?.addEventListener('input', () => {
+    const el = document.querySelector<HTMLInputElement>('#admin-storage-path');
+    if (el) el.dataset.userEdited = '1';
+  });
 }
 
 function renderLogin(loading: boolean): string {
@@ -172,7 +231,10 @@ function renderHome(state: AppState): string {
           <h2 class="panel-title">Instructions</h2>
           <p class="panel-sub">${escapeHtml(state.session?.user.email ?? '')}</p>
         </div>
-        <button type="button" class="action" id="logout">Sign out</button>
+        <div class="header-actions">
+          ${state.isAdmin ? `<button type="button" class="action" id="go-admin">Admin</button><span class="action-sep">·</span>` : ''}
+          <button type="button" class="action" id="logout">Sign out</button>
+        </div>
       </header>
       ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId, state.registeringInstructionId)}
     </section>
@@ -382,14 +444,17 @@ async function onLogout(config: KivaConfig): Promise<void> {
 
 export async function bootstrapHomeData(config: KivaConfig): Promise<void> {
   if (!controller) return;
+  const userId = controller.getState().session?.user.id;
   controller.setState({ instructionsLoading: true, artifactsLoading: true, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   try {
+    const isAdmin = userId ? await fetchIsAdmin(config, userId) : false;
     const items = await loadInstructionsView(config);
     const drafts = await listLocalDrafts();
     const remote = await loadServerArtifacts(config);
     controller.setState({
+      isAdmin,
       instructions: items,
       drafts,
       serverArtifacts: remote.ok ? remote.rows : [],
@@ -552,7 +617,129 @@ export function applySession(session: Session | null): void {
     actingArtifactId: null,
     registeringInstructionId: null,
     notice: null,
+    isAdmin: session ? prev.isAdmin : false,
+    adminRows: session ? prev.adminRows : [],
+    adminEditId: null,
   });
   renderApp(controller.root, controller.config, controller.getState());
   if (session) void bootstrapHomeData(controller.config);
+}
+
+function goHome(): void {
+  if (!controller) return;
+  controller.setState({ view: 'home', adminEditId: null, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
+}
+
+async function openAdmin(config: KivaConfig): Promise<void> {
+  if (!controller) return;
+  controller.setState({ view: 'admin', adminLoading: true, adminEditId: null, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
+  const result = await listAllInstructionsForAdmin(config);
+  controller.setState({
+    adminRows: result.ok ? result.rows : [],
+    adminLoading: false,
+    error: result.ok ? null : result.message,
+  });
+  renderApp(controller.root, controller.config, controller.getState());
+}
+
+async function reloadAdminList(config: KivaConfig): Promise<void> {
+  if (!controller) return;
+  const result = await listAllInstructionsForAdmin(config);
+  controller.setState({
+    adminRows: result.ok ? result.rows : [],
+    error: result.ok ? null : result.message,
+  });
+  renderApp(controller.root, controller.config, controller.getState());
+}
+
+function readAdminForm(form: HTMLFormElement): {
+  slug: string;
+  title: string;
+  version: string;
+  description: string;
+  published: boolean;
+  storagePath: string;
+  file: File | null;
+} {
+  const fd = new FormData(form);
+  return {
+    slug: String(fd.get('slug') ?? '').trim(),
+    title: String(fd.get('title') ?? '').trim(),
+    version: String(fd.get('version') ?? '').trim(),
+    description: String(fd.get('description') ?? '').trim(),
+    published: fd.get('published') === 'on',
+    storagePath: String(fd.get('storagePath') ?? '').trim(),
+    file: (form.querySelector<HTMLInputElement>('[name="file"]')?.files?.[0] as File | undefined) ?? null,
+  };
+}
+
+function syncAdminStoragePathFromSlug(): void {
+  const slug = document.querySelector<HTMLInputElement>('#admin-slug')?.value ?? '';
+  const fileInput = document.querySelector<HTMLInputElement>('#admin-file');
+  const pathInput = document.querySelector<HTMLInputElement>('#admin-storage-path');
+  if (!pathInput || pathInput.dataset.userEdited === '1') return;
+  const name = fileInput?.files?.[0]?.name ?? 'file.pdf';
+  pathInput.value = defaultStoragePath(slug, name);
+}
+
+function syncAdminStoragePathFromFile(): void {
+  const slug = document.querySelector<HTMLInputElement>('#admin-slug')?.value ?? '';
+  const fileInput = document.querySelector<HTMLInputElement>('#admin-file');
+  const pathInput = document.querySelector<HTMLInputElement>('#admin-storage-path');
+  if (!pathInput || !fileInput?.files?.[0]) return;
+  if (pathInput.dataset.userEdited !== '1') {
+    pathInput.value = defaultStoragePath(slug, fileInput.files[0].name);
+  }
+}
+
+async function onAdminFormSubmit(config: KivaConfig, form: HTMLFormElement): Promise<void> {
+  if (!controller) return;
+  const userId = controller.getState().session?.user.id;
+  if (!userId) return;
+
+  const input = readAdminForm(form);
+  const editId = controller.getState().adminEditId;
+  controller.setState({ adminSaving: true, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
+
+  const result =
+    editId === 'new'
+      ? await createInstructionAsAdmin(config, input, userId)
+      : editId
+        ? await updateInstructionAsAdmin(config, editId, input)
+        : { ok: false as const, message: 'Nothing to save.' };
+
+  controller.setState({ adminSaving: false });
+  if (!result.ok) {
+    controller.setState({ error: result.message });
+    renderApp(controller.root, controller.config, controller.getState());
+    return;
+  }
+
+  controller.setState({ adminEditId: null, notice: 'Instruction saved.' });
+  await reloadAdminList(config);
+  await bootstrapHomeData(config);
+  renderApp(controller.root, controller.config, controller.getState());
+}
+
+async function onAdminDelete(config: KivaConfig, id: string): Promise<void> {
+  if (!controller) return;
+  const row = controller.getState().adminRows.find((r) => r.id === id);
+  if (!row) return;
+  if (!window.confirm(`Delete “${row.title}”?`)) return;
+
+  controller.setState({ actingArtifactId: id, error: null });
+  renderApp(controller.root, controller.config, controller.getState());
+  const result = await deleteInstructionAsAdmin(config, row);
+  controller.setState({ actingArtifactId: null });
+  if (!result.ok) {
+    controller.setState({ error: result.message });
+  } else {
+    controller.setState({ notice: 'Instruction deleted.' });
+    await reloadAdminList(config);
+    await bootstrapHomeData(config);
+  }
+  renderApp(controller.root, controller.config, controller.getState());
 }

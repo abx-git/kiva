@@ -57,6 +57,8 @@ Ohne SQL-Setup siehst du in Supabase **keine Tabellen** — das ist normal, bis 
 
 **Artifact tables (delete / team download):** After an older setup, run [supabase/kiva/artifacts-policies.sql](./supabase/kiva/artifacts-policies.sql) once in the SQL Editor.
 
+**Admin UI (manage instructions in the app):** Run [supabase/kiva/admin-policies.sql](./supabase/kiva/admin-policies.sql), then set `profiles.is_admin = true` for your user. In Kiva, open **Admin** (link appears when signed in as admin).
+
 ### Cloud Agent: SQL automatisch ausführen lassen
 
 Der Browser-Key (`VITE_SUPABASE_ANON_KEY`) darf **kein DDL** ausführen. Damit der Agent `setup.sql` per Shell anwenden kann, brauchst du eine **Postgres-Verbindung** als Secret:

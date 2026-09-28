@@ -122,6 +122,41 @@ body {
   margin-bottom: 0.75rem;
 }
 
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.35rem;
+}
+
+.admin-form textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.85rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 0.95rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.admin-form input[type='file'] {
+  margin-bottom: 0.85rem;
+}
+
+.admin-form-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.admin-form-actions .action {
+  align-self: flex-start;
+}
+
 .panel-title {
   margin: 0;
   font-size: 0.95rem;

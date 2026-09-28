@@ -1,9 +1,10 @@
 import type { Session } from '@supabase/supabase-js';
 import type { ServerArtifactRow } from './lib/artifacts-remote';
 import type { LocalArtifactRecord } from './lib/artifacts-types';
+import type { InstructionAdminRow } from './lib/instructions-admin';
 import type { InstructionListItem } from './lib/instructions-types';
 
-export type AppView = 'login' | 'home';
+export type AppView = 'login' | 'home' | 'admin';
 
 export interface LocalArtifactDraft {
   id: string;
@@ -28,4 +29,9 @@ export interface AppState {
   actingArtifactId: string | null;
   registeringInstructionId: string | null;
   notice: string | null;
+  isAdmin: boolean;
+  adminRows: InstructionAdminRow[];
+  adminLoading: boolean;
+  adminSaving: boolean;
+  adminEditId: string | null;
 }
