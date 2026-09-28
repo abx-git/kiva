@@ -17,9 +17,19 @@ export async function signInWithPassword(
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    return { ok: false, message: error.message };
+    return { ok: false, message: mapAuthError(error.message) };
   }
   return { ok: true };
+}
+
+function mapAuthError(message: string): string {
+  if (/database error querying schema/i.test(message)) {
+    return (
+      'Login failed: the user row in Supabase Auth is invalid (often after manual SQL). ' +
+      'Run supabase/kiva/test-user.sql (UPDATE block) in the SQL Editor, or create the user under Authentication → Users.'
+    );
+  }
+  return message;
 }
 
 export async function signOut(config: KivaConfig): Promise<void> {
