@@ -271,7 +271,8 @@ function renderSharedList(
     .map((row) => {
       const own = row.ownerId === userId;
       const busy = actingId === row.id;
-      const meta = `${instructionTitle(instructions, row.instructionId)} · ${own ? 'You' : 'Teammate'}`;
+      const title = instructionTitle(instructions, row.instructionId);
+      const meta = own ? `Instruction: ${title}` : `Instruction: ${title} · from teammate`;
       const actions = [
         actionButton('Download', `data-download-server="${escapeHtml(row.id)}"`, busy),
         own ? actionSep() : '',
@@ -297,7 +298,7 @@ function renderPrivateList(
   const draftHtml = drafts
     .map((d) => {
       const busy = actingId === d.id;
-      const meta = `${instructionTitle(instructions, d.instructionId)} · Draft`;
+      const meta = `Instruction: ${instructionTitle(instructions, d.instructionId)} · not uploaded yet`;
       const actions = [
         actionButton('Upload', `data-upload-draft="${escapeHtml(d.id)}"`, busy),
         actionSep(),
@@ -310,7 +311,7 @@ function renderPrivateList(
   const serverHtml = serverRows
     .map((row) => {
       const busy = actingId === row.id;
-      const meta = `${instructionTitle(instructions, row.instructionId)} · Private`;
+      const meta = `Instruction: ${instructionTitle(instructions, row.instructionId)}`;
       const actions = [
         actionButton('Download', `data-download-server="${escapeHtml(row.id)}"`, busy),
         actionSep(),
