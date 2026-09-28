@@ -42,7 +42,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
         <p class="tagline">Work locally · share centrally</p>
       </div>
     </header>
-    ${!configured ? `<div class="alert warn" role="status">Demo mode: Supabase keys missing (<code>kiva/.env</code>). Login is disabled.</div>` : ''}
+    ${!configured ? `<div class="alert warn" role="status">Supabase is not configured for this build. Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (local: <code>kiva/.env</code>; GitHub Pages: repository secrets) and redeploy.</div>` : ''}
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
     ${state.view === 'login' ? renderLogin(configured, state.loading) : renderHome(state)}
   `;
@@ -120,10 +120,10 @@ function renderLogin(configured: boolean, loading: boolean): string {
       <p>Access the central Kiva database (Supabase). After sign-in you can load instructions and save them offline.</p>
       <form id="login-form">
         <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="username" required ${configured ? '' : 'disabled'} />
+        <input id="email" name="email" type="email" autocomplete="username" required ${loading ? 'disabled' : ''} />
         <label for="password">Password</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" required ${configured ? '' : 'disabled'} />
-        <button type="submit" ${configured && !loading ? '' : 'disabled'}>${loading ? 'Signing in…' : 'Sign in'}</button>
+        <input id="password" name="password" type="password" autocomplete="current-password" required ${loading ? 'disabled' : ''} />
+        <button type="submit" ${loading ? 'disabled' : ''}>${loading ? 'Signing in…' : 'Sign in'}</button>
       </form>
     </section>
     <div class="roadmap">
