@@ -25,3 +25,7 @@ export async function getArtifact(id: string): Promise<LocalArtifactRecord | und
 export async function saveArtifact(record: LocalArtifactRecord): Promise<void> {
   await db.put(STORE, record);
 }
+
+export async function deleteArtifactRecord(id: string): Promise<void> {
+  await db.delete(STORE, id);
+}

@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
+import type { ServerArtifactRow } from './lib/artifacts-remote';
 import type { LocalArtifactRecord } from './lib/artifacts-types';
 import type { InstructionListItem } from './lib/instructions-types';
 
@@ -21,8 +22,10 @@ export interface AppState {
   instructions: InstructionListItem[];
   instructionsLoading: boolean;
   downloadingId: string | null;
-  artifacts: LocalArtifactRecord[];
-  uploadingArtifactId: string | null;
+  drafts: LocalArtifactRecord[];
+  serverArtifacts: ServerArtifactRow[];
+  artifactsLoading: boolean;
+  actingArtifactId: string | null;
   registeringInstructionId: string | null;
   notice: string | null;
 }

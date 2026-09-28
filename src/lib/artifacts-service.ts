@@ -1,15 +1,23 @@
 import type { KivaConfig } from '../config';
-import { getSupabase } from './supabase';
-import { getArtifactBlob, putArtifactBlob } from './artifacts-blobs';
+import { deleteArtifactBlob, getArtifactBlob, putArtifactBlob } from './artifacts-blobs';
+import { deleteArtifactRecord, getArtifact, listAllArtifacts, saveArtifact } from './artifacts-local';
+import {
+  deleteServerArtifact,
+  downloadServerArtifact,
+  fetchServerArtifacts,
+  patchArtifactVisibility,
+  type ServerArtifactRow,
+} from './artifacts-remote';
 import type { LocalArtifactRecord } from './artifacts-types';
-import { getArtifact, listAllArtifacts, saveArtifact } from './artifacts-local';
+import { getSupabase } from './supabase';
 
 export const ARTIFACTS_BUCKET = 'artifacts';
+
+export type { ServerArtifactRow };
 
 export async function registerArtifactFromFile(
   instructionId: string,
   file: File,
-  visibility: 'private' | 'community',
 ): Promise<LocalArtifactRecord> {
   const id = crypto.randomUUID();
   const sha256 = await hashFileSha256(file);
@@ -22,7 +30,7 @@ export async function registerArtifactFromFile(
     sha256,
     createdAt: new Date().toISOString(),
     syncStatus: 'local',
-    visibility,
+    visibility: 'private',
     remoteId: null,
     errorMessage: null,
     sizeBytes: file.size,
@@ -35,7 +43,7 @@ export async function uploadArtifact(
   config: KivaConfig,
   artifactId: string,
   ownerId: string,
-): Promise<{ ok: true; record: LocalArtifactRecord } | { ok: false; message: string }> {
+): Promise<{ ok: true } | { ok: false; message: string }> {
   const supabase = getSupabase(config);
   if (!supabase) {
     return { ok: false, message: 'Supabase is not configured.' };
@@ -43,7 +51,7 @@ export async function uploadArtifact(
 
   const meta = await getArtifact(artifactId);
   if (!meta) {
-    return { ok: false, message: 'Artifact not found.' };
+    return { ok: false, message: 'Draft not found.' };
   }
 
   const blob = await getArtifactBlob(artifactId);
@@ -51,87 +59,95 @@ export async function uploadArtifact(
     return { ok: false, message: 'Local file is missing.' };
   }
 
-  const uploading: LocalArtifactRecord = { ...meta, syncStatus: 'uploading', errorMessage: null };
-  await saveArtifact(uploading);
-
   const storagePath = `${ownerId}/${artifactId}/${meta.fileName}`;
   const { error: uploadError } = await supabase.storage
     .from(ARTIFACTS_BUCKET)
     .upload(storagePath, blob, { upsert: true, contentType: blob.type || undefined });
 
   if (uploadError) {
-    const message = mapStorageSetupError(uploadError.message);
-    const failed: LocalArtifactRecord = {
-      ...uploading,
-      syncStatus: 'error',
-      errorMessage: message,
-    };
-    await saveArtifact(failed);
-    return { ok: false, message };
+    return { ok: false, message: mapStorageSetupError(uploadError.message) };
   }
 
-  const { data: row, error: insertError } = await supabase
-    .from('artifacts')
-    .insert({
-      id: artifactId,
-      instruction_id: meta.instructionId,
-      owner_id: ownerId,
-      file_name: meta.fileName,
-      sha256: meta.sha256,
-      storage_path: storagePath,
-      visibility: meta.visibility,
-      published_at: meta.visibility === 'community' ? new Date().toISOString() : null,
-    })
-    .select('id')
-    .single();
+  const { error: insertError } = await supabase.from('artifacts').insert({
+    id: artifactId,
+    instruction_id: meta.instructionId,
+    owner_id: ownerId,
+    file_name: meta.fileName,
+    sha256: meta.sha256,
+    storage_path: storagePath,
+    visibility: meta.visibility,
+    published_at: meta.visibility === 'community' ? new Date().toISOString() : null,
+  });
 
   if (insertError) {
-    const failed: LocalArtifactRecord = {
-      ...uploading,
-      syncStatus: 'error',
-      errorMessage: insertError.message,
-    };
-    await saveArtifact(failed);
     return { ok: false, message: insertError.message };
   }
 
-  const published: LocalArtifactRecord = {
-    ...meta,
-    syncStatus: 'published',
-    remoteId: row?.id ?? artifactId,
-    errorMessage: null,
-  };
-  await saveArtifact(published);
-  return { ok: true, record: published };
+  await deleteArtifactBlob(artifactId);
+  await deleteArtifactRecord(artifactId);
+  return { ok: true };
 }
 
-export async function refreshArtifactList(): Promise<LocalArtifactRecord[]> {
-  return listAllArtifacts();
+export async function listLocalDrafts(): Promise<LocalArtifactRecord[]> {
+  const all = await listAllArtifacts();
+  return all.filter((a) => a.syncStatus === 'local' || a.syncStatus === 'error');
 }
 
-export async function setArtifactVisibility(
+export async function deleteLocalDraft(artifactId: string): Promise<void> {
+  await deleteArtifactBlob(artifactId);
+  await deleteArtifactRecord(artifactId);
+}
+
+export async function loadServerArtifacts(
+  config: KivaConfig,
+): Promise<{ ok: true; rows: ServerArtifactRow[] } | { ok: false; message: string }> {
+  return fetchServerArtifacts(config);
+}
+
+export async function setServerArtifactVisibility(
+  config: KivaConfig,
   artifactId: string,
   visibility: 'private' | 'community',
 ): Promise<{ ok: true } | { ok: false; message: string }> {
-  const meta = await getArtifact(artifactId);
-  if (!meta) {
-    return { ok: false, message: 'File not found.' };
+  return patchArtifactVisibility(config, artifactId, visibility);
+}
+
+export async function removeServerArtifact(
+  config: KivaConfig,
+  row: ServerArtifactRow,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  return deleteServerArtifact(config, row.storagePath, row.id);
+}
+
+export async function downloadServerArtifactFile(
+  config: KivaConfig,
+  row: ServerArtifactRow,
+): Promise<{ ok: true; fileName: string } | { ok: false; message: string }> {
+  if (!row.storagePath) {
+    return { ok: false, message: 'No file on server.' };
   }
-  if (meta.syncStatus === 'uploading') {
-    return { ok: false, message: 'Wait until the current upload finishes.' };
-  }
-  if (meta.syncStatus === 'published') {
-    return { ok: false, message: 'Already on server — visibility cannot be changed here.' };
-  }
-  await saveArtifact({ ...meta, visibility });
-  return { ok: true };
+  const result = await downloadServerArtifact(config, row.storagePath);
+  if (!result.ok) return result;
+  triggerBrowserDownload(result.blob, row.fileName);
+  return { ok: true, fileName: row.fileName };
+}
+
+function triggerBrowserDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = 'noopener';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 function mapStorageSetupError(message: string): string {
   if (/bucket not found/i.test(message)) {
     return (
-      'Storage bucket "artifacts" is missing. In Supabase run supabase/kiva/setup.sql or ' +
-      'supabase/kiva/storage-setup.sql (SQL Editor), or create a private bucket named artifacts.'
+      'Storage bucket "artifacts" is missing. Run supabase/kiva/setup.sql in Supabase.'
     );
   }
   return message;

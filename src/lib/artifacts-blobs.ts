@@ -20,6 +20,19 @@ export async function putArtifactBlob(id: string, blob: Blob): Promise<void> {
   });
 }
 
+export async function deleteArtifactBlob(id: string): Promise<void> {
+  const db = await openKivaDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(BLOB_STORE, 'readwrite');
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onerror = () => reject(tx.error);
+    tx.objectStore(BLOB_STORE).delete(id);
+  });
+}
+
 export async function getArtifactBlob(id: string): Promise<Blob | undefined> {
   const db = await openKivaDb();
   return new Promise((resolve, reject) => {

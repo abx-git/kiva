@@ -55,6 +55,8 @@ Ohne SQL-Setup siehst du in Supabase **keine Tabellen** — das ist normal, bis 
 
 **Upload „Bucket not found“:** Storage-Buckets fehlen. Einmal [supabase/kiva/storage-setup.sql](./supabase/kiva/storage-setup.sql) im SQL Editor ausführen (oder komplett [setup.sql](./supabase/kiva/setup.sql)). Buckets heißen exakt `artifacts` und `instructions` (klein, privat).
 
+**Artifact tables (delete / team download):** After an older setup, run [supabase/kiva/artifacts-policies.sql](./supabase/kiva/artifacts-policies.sql) once in the SQL Editor.
+
 ### Cloud Agent: SQL automatisch ausführen lassen
 
 Der Browser-Key (`VITE_SUPABASE_ANON_KEY`) darf **kein DDL** ausführen. Damit der Agent `setup.sql` per Shell anwenden kann, brauchst du eine **Postgres-Verbindung** als Secret:
