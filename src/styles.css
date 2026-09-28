@@ -286,6 +286,46 @@ button.compact {
   flex: 1 1 auto;
 }
 
+.instruction-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.05rem;
+}
+
+.pending-uploads {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+}
+
+.pending-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pending-name {
+  flex: 1 1 8rem;
+  font-size: 0.9rem;
+  word-break: break-word;
+}
+
+.pending-error {
+  font-size: 0.85rem;
+  color: var(--danger);
+  padding: 0 0 0.5rem;
+  list-style: none;
+}
+
+.compact-check {
+  min-height: auto;
+  padding: 0;
+  font-size: 0.85rem;
+}
+
 .badge {
   font-size: 0.7rem;
   padding: 0.15rem 0.45rem;

@@ -43,13 +43,13 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
       <img src="${import.meta.env.BASE_URL}icon.svg" width="40" height="40" alt="" />
       <div>
         <h1>Kiva</h1>
-        <p class="tagline">Instructions in. Results out. Work in your own apps.</p>
+        <p class="tagline">Get instructions · work in your apps · upload results</p>
       </div>
     </header>
     ${!configured ? `<div class="alert warn" role="status">Supabase is not configured for this build. Set <code>VITE_SUPABASE_URL</code> and <code>VITE_SUPABASE_ANON_KEY</code> (local: <code>kiva/.env</code>; GitHub Pages: repository secrets) and redeploy.</div>` : ''}
     ${state.notice ? `<div class="alert ok" role="status">${escapeHtml(state.notice)}</div>` : ''}
     ${state.error ? `<div class="alert error" role="alert">${escapeHtml(state.error)}</div>` : ''}
-    ${state.view === 'login' ? renderLogin(configured, state.loading) : renderHome(state)}
+    ${state.view === 'login' ? renderLogin(state.loading) : renderHome(state)}
   `;
 
   if (state.view === 'login') {
@@ -64,8 +64,9 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
   }
 
   if (state.view === 'home') {
-    const refreshBtn = root.querySelector<HTMLButtonElement>('#refresh-instructions');
-    refreshBtn?.addEventListener('click', () => void onRefreshInstructions(config));
+    root.querySelector<HTMLButtonElement>('#refresh-instructions')?.addEventListener('click', () =>
+      void onRefreshInstructions(config),
+    );
 
     root.querySelectorAll<HTMLButtonElement>('[data-download-id]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -87,11 +88,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
         const instructionId = input.dataset.fileInput;
         const files = input.files ? [...input.files] : [];
         input.value = '';
-        if (!instructionId) return;
-        if (files.length === 0) {
-          controller?.setState({ notice: null });
-          return;
-        }
+        if (!instructionId || files.length === 0) return;
         void onRegisterArtifacts(instructionId, files);
       });
     });
@@ -100,8 +97,7 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
       box.addEventListener('change', () => {
         const id = box.dataset.artifactVisibility;
         if (!id) return;
-        const visibility = box.checked ? 'community' : 'private';
-        void onArtifactVisibilityChange(id, visibility);
+        void onArtifactVisibilityChange(id, box.checked ? 'community' : 'private');
       });
     });
 
@@ -113,31 +109,14 @@ export function renderApp(root: HTMLElement, config: KivaConfig, state: AppState
     });
   }
 
-  const logoutBtn = root.querySelector<HTMLButtonElement>('#logout');
-  logoutBtn?.addEventListener('click', () => void onLogout(config));
+  root.querySelector<HTMLButtonElement>('#logout')?.addEventListener('click', () => void onLogout(config));
 }
 
-function renderHowItWorks(): string {
+function renderLogin(loading: boolean): string {
   return `
-    <section class="card how-it-works" aria-labelledby="how-title">
-      <h2 id="how-title">How Kiva works</h2>
-      <p>Kiva is not where you edit files. It lists instructions from the server, keeps a copy in this browser, and sends your finished result files back.</p>
-      <ol class="step-list">
-        <li><strong>Sync from server</strong> — update the instruction list from Supabase.</li>
-        <li><strong>Save offline</strong> — store the instruction file inside Kiva on this device.</li>
-        <li><strong>Export to device</strong> — download that copy so PDF, CAD, or other apps can open it.</li>
-        <li>Work in your apps, then <strong>Attach result file(s)</strong> — set <strong>Share with team</strong> per file — and <strong>Send to server</strong>.</li>
-      </ol>
-    </section>
-  `;
-}
-
-function renderLogin(_configured: boolean, loading: boolean): string {
-  return `
-    ${renderHowItWorks()}
     <section class="card" aria-labelledby="login-title">
       <h2 id="login-title">Sign in</h2>
-      <p>Use your team account. Editing happens in your own software after you export an instruction.</p>
+      <p class="section-lead">Download team instructions, open them in your own software, upload your result files.</p>
       <form id="login-form">
         <label for="email">Email</label>
         <input id="email" name="email" type="email" autocomplete="username" required ${loading ? 'disabled' : ''} />
@@ -152,43 +131,53 @@ function renderLogin(_configured: boolean, loading: boolean): string {
 function renderHome(state: AppState): string {
   const email = state.session?.user.email ?? 'Unknown';
   return `
-    ${renderHowItWorks()}
     <section class="card card-session" aria-labelledby="home-title">
-      <h2 id="home-title">Instruction catalog</h2>
-      <p class="session-line">Signed in as <span class="session-email">${escapeHtml(email)}</span></p>
-      <p class="help-line" id="sync-help"><strong>Sync from server</strong> reloads the published instruction list from Supabase. It does not download files — use <strong>Save offline</strong> on each item.</p>
-      <div class="toolbar">
-        <button type="button" class="secondary compact" id="refresh-instructions" aria-describedby="sync-help" ${state.instructionsLoading ? 'disabled' : ''}>
-          ${state.instructionsLoading ? 'Syncing…' : 'Sync from server'}
-        </button>
+      <div class="instruction-head">
+        <h2 id="home-title">Instructions</h2>
         <button type="button" class="secondary compact" id="logout">Sign out</button>
       </div>
+      <p class="session-line">${escapeHtml(email)}</p>
+      <button type="button" class="secondary compact" id="refresh-instructions" ${state.instructionsLoading ? 'disabled' : ''}>
+        ${state.instructionsLoading ? 'Syncing…' : 'Sync list'}
+      </button>
     </section>
     <section class="card" aria-labelledby="list-title">
-      <h2 id="list-title">Published instructions</h2>
-      <p class="section-lead">Each row is one instruction package on the server. Save it offline, export it to work elsewhere, then attach your result below.</p>
-      ${renderInstructionList(state.instructions, state.instructionsLoading, state.downloadingId, state.registeringInstructionId)}
-    </section>
-    <section class="card" aria-labelledby="artifacts-title">
-      <h2 id="artifacts-title">Your result files</h2>
-      <p class="section-lead">You can attach many files per instruction. Choose <strong>Share with team</strong> separately for each file before <strong>Send to server</strong>.</p>
-      ${renderArtifactList(state.artifacts, state.uploadingArtifactId, state.instructions, state.session?.user.id)}
+      <h2 id="list-title" class="sr-only">Instruction list</h2>
+      ${renderInstructionList(
+        state.instructions,
+        state.artifacts,
+        state.instructionsLoading,
+        state.downloadingId,
+        state.registeringInstructionId,
+        state.uploadingArtifactId,
+      )}
     </section>
   `;
 }
 
+function pendingArtifacts(
+  artifacts: LocalArtifactRecord[],
+  instructionId: string,
+): LocalArtifactRecord[] {
+  return artifacts.filter(
+    (a) => a.instructionId === instructionId && a.syncStatus !== 'published',
+  );
+}
+
 function renderInstructionList(
   items: InstructionListItem[],
+  artifacts: LocalArtifactRecord[],
   loading: boolean,
   downloadingId: string | null,
   registeringInstructionId: string | null,
+  uploadingArtifactId: string | null,
 ): string {
   if (loading && items.length === 0) {
-    return `<p class="muted">Loading instruction list…</p>`;
+    return `<p class="muted">Loading…</p>`;
   }
 
   if (items.length === 0) {
-    return `<p class="muted">No published instructions yet. Ask an admin to publish in Supabase, then tap <strong>Sync from server</strong>.</p>`;
+    return `<p class="muted">No instructions yet. Tap <strong>Sync list</strong>.</p>`;
   }
 
   return `
@@ -196,20 +185,10 @@ function renderInstructionList(
       ${items
         .map((item) => {
           const busy = downloadingId === item.id;
-          const size =
-            item.sizeBytes != null ? formatBytes(item.sizeBytes) : null;
+          const pending = pendingArtifacts(artifacts, item.id);
           return `
         <li class="instruction-item">
-          <div class="instruction-head">
-            <h3>${escapeHtml(item.title)}</h3>
-            <span class="badge">${escapeHtml(item.version)}</span>
-            ${item.isCached ? '<span class="badge badge-ok">Saved in app</span>' : '<span class="badge badge-muted">Server only</span>'}
-          </div>
-          ${item.description ? `<p class="instruction-desc">${escapeHtml(item.description)}</p>` : ''}
-          <p class="instruction-meta">
-            <span>${escapeHtml(item.fileName)}</span>
-            ${size ? `<span>${size}</span>` : ''}
-          </p>
+          <h3 class="instruction-title">${escapeHtml(item.title)}</h3>
           <div class="instruction-actions">
             <button
               type="button"
@@ -217,28 +196,24 @@ function renderInstructionList(
               data-download-id="${escapeHtml(item.id)}"
               data-storage-path="${escapeHtml(item.storagePath)}"
               ${busy ? 'disabled' : ''}
-            >${busy ? 'Saving…' : item.isCached ? 'Update offline copy' : 'Save offline'}</button>
+            >${busy ? '…' : item.isCached ? 'Re-download' : 'Download'}</button>
             <button
               type="button"
               class="secondary compact"
               data-open-id="${escapeHtml(item.id)}"
               ${item.isCached ? '' : 'disabled'}
-              title="${item.isCached ? 'Download the saved copy to your device' : 'Save offline first'}"
-            >Export to device</button>
-          </div>
-          <div class="register-row">
-            <p class="share-hint">Pick one or many result files. Sharing is set per file under <strong>Your result files</strong>.</p>
+            >Open file</button>
             <label class="file-attach-btn secondary compact">
-              ${registeringInstructionId === item.id ? 'Attaching…' : 'Attach result file(s)'}
+              ${registeringInstructionId === item.id ? '…' : 'Add results'}
               <input
                 type="file"
                 multiple
-                id="file-${escapeHtml(item.id)}"
                 data-file-input="${escapeHtml(item.id)}"
                 ${registeringInstructionId === item.id ? 'disabled' : ''}
               />
             </label>
           </div>
+          ${renderPendingUploads(pending, uploadingArtifactId)}
         </li>`;
         })
         .join('')}
@@ -246,77 +221,30 @@ function renderInstructionList(
   `;
 }
 
-function instructionTitleFor(instructions: InstructionListItem[], instructionId: string): string {
-  return instructions.find((i) => i.id === instructionId)?.title ?? 'Instruction';
-}
-
-function renderArtifactList(
-  artifacts: LocalArtifactRecord[],
-  uploadingId: string | null,
-  instructions: InstructionListItem[],
-  userId?: string,
-): string {
-  if (!userId) {
-    return `<p class="muted">Not signed in.</p>`;
-  }
-  if (artifacts.length === 0) {
-    return `<p class="muted">Nothing attached yet. Use <strong>Attach result file(s)</strong> on an instruction — you can add several files.</p>`;
-  }
+function renderPendingUploads(pending: LocalArtifactRecord[], uploadingId: string | null): string {
+  if (pending.length === 0) return '';
 
   return `
-    <ul class="instruction-list">
-      ${artifacts
+    <ul class="pending-uploads">
+      ${pending
         .map((a) => {
           const busy = uploadingId === a.id;
-          const statusLabel =
-            a.syncStatus === 'published'
-              ? a.visibility === 'community'
-                ? 'On server · shared'
-                : 'On server · private'
-              : a.syncStatus === 'local'
-                ? 'On this device only'
-                : a.syncStatus === 'uploading'
-                  ? 'Sending…'
-                  : 'Error';
-          const canEditShare = a.syncStatus === 'local' || a.syncStatus === 'error';
-          const instructionTitle = instructionTitleFor(instructions, a.instructionId);
           return `
-        <li class="instruction-item">
-          <div class="instruction-head">
-            <h3>${escapeHtml(a.fileName)}</h3>
-            <span class="badge">${escapeHtml(statusLabel)}</span>
-          </div>
-          <p class="instruction-meta">
-            <span>For: ${escapeHtml(instructionTitle)}</span>
-            <span>${formatBytes(a.sizeBytes)}</span>
-          </p>
-          ${a.errorMessage ? `<p class="instruction-desc">${escapeHtml(a.errorMessage)}</p>` : ''}
-          ${
-            canEditShare
-              ? `<label class="checkbox artifact-share">
-            <input type="checkbox" data-artifact-visibility="${escapeHtml(a.id)}" ${a.visibility === 'community' ? 'checked' : ''} />
-            Share with team when uploaded
-          </label>`
-              : a.syncStatus === 'published'
-                ? `<p class="instruction-desc muted">${a.visibility === 'community' ? 'Visible to teammates.' : 'Only you can see this on the server.'}</p>`
-                : ''
-          }
-          <div class="instruction-actions">
-            <button type="button" class="secondary compact" data-upload-artifact="${escapeHtml(a.id)}" ${a.syncStatus === 'published' || busy ? 'disabled' : ''}>
-              ${busy ? 'Sending…' : 'Send to server'}
-            </button>
-          </div>
-        </li>`;
+        <li class="pending-row">
+          <span class="pending-name">${escapeHtml(a.fileName)}</span>
+          <label class="checkbox compact-check">
+            <input type="checkbox" data-artifact-visibility="${escapeHtml(a.id)}" ${a.visibility === 'community' ? 'checked' : ''} ${busy ? 'disabled' : ''} />
+            Share
+          </label>
+          <button type="button" class="secondary compact" data-upload-artifact="${escapeHtml(a.id)}" ${busy ? 'disabled' : ''}>
+            ${busy ? '…' : 'Upload'}
+          </button>
+        </li>
+        ${a.errorMessage ? `<li class="pending-error">${escapeHtml(a.errorMessage)}</li>` : ''}`;
         })
         .join('')}
     </ul>
   `;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 function escapeHtml(text: string): string {
@@ -413,11 +341,7 @@ async function onDownloadInstruction(
 
 async function onRegisterArtifacts(instructionId: string, files: File[]): Promise<void> {
   if (!controller || files.length === 0) return;
-  controller.setState({
-    registeringInstructionId: instructionId,
-    error: null,
-    notice: null,
-  });
+  controller.setState({ registeringInstructionId: instructionId, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   try {
@@ -425,27 +349,17 @@ async function onRegisterArtifacts(instructionId: string, files: File[]): Promis
       await registerArtifactFromFile(instructionId, file, 'private');
     }
     const artifacts = await refreshArtifactList();
-    const count = files.length;
-    const names =
-      count === 1
-        ? `“${files[0].name}”`
-        : `${count} files (${files.map((f) => f.name).join(', ')})`;
     controller.setState({
       artifacts,
       registeringInstructionId: null,
       error: null,
-      notice: `Attached ${names}. Set Share with team for each file below, then Send to server.`,
+      notice: files.length === 1 ? `Added ${files[0].name}. Tap Upload when ready.` : `Added ${files.length} files. Tap Upload on each.`,
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Could not attach file.';
-    controller.setState({
-      registeringInstructionId: null,
-      error: message,
-      notice: null,
-    });
+    const message = err instanceof Error ? err.message : 'Could not add file.';
+    controller.setState({ registeringInstructionId: null, error: message, notice: null });
   }
   renderApp(controller.root, controller.config, controller.getState());
-  document.getElementById('artifacts-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function onArtifactVisibilityChange(
@@ -456,11 +370,10 @@ async function onArtifactVisibilityChange(
   const result = await setArtifactVisibility(artifactId, visibility);
   if (!result.ok) {
     controller.setState({ error: result.message });
-    renderApp(controller.root, controller.config, controller.getState());
-    return;
+  } else {
+    const artifacts = await refreshArtifactList();
+    controller.setState({ artifacts, error: null });
   }
-  const artifacts = await refreshArtifactList();
-  controller.setState({ artifacts, error: null });
   renderApp(controller.root, controller.config, controller.getState());
 }
 
@@ -473,7 +386,10 @@ async function onUploadArtifact(config: KivaConfig, artifactId: string): Promise
     return;
   }
 
-  controller.setState({ uploadingArtifactId: artifactId, error: null });
+  const fileName =
+    controller.getState().artifacts.find((a) => a.id === artifactId)?.fileName ?? 'File';
+
+  controller.setState({ uploadingArtifactId: artifactId, error: null, notice: null });
   renderApp(controller.root, controller.config, controller.getState());
 
   const result = await uploadArtifact(config, artifactId, userId);
@@ -482,6 +398,7 @@ async function onUploadArtifact(config: KivaConfig, artifactId: string): Promise
     uploadingArtifactId: null,
     artifacts,
     error: result.ok ? null : result.message,
+    notice: result.ok ? `Uploaded ${fileName}.` : null,
   });
   renderApp(controller.root, controller.config, controller.getState());
 }
@@ -499,10 +416,7 @@ export function applySession(session: Session | null): void {
   if (!controller) return;
   const prev = controller.getState();
   const nextView = session ? 'home' : 'login';
-  const nextUserId = session?.user.id ?? null;
-  const prevUserId = prev.session?.user.id ?? null;
 
-  // Supabase emits INITIAL_SESSION after startup with null session; don't wipe the login form.
   if (!session && !prev.session && prev.view === 'login' && nextView === 'login') {
     return;
   }

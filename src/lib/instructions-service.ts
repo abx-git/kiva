@@ -76,7 +76,7 @@ export async function openCachedInstruction(
   if (!record) {
     return {
       ok: false,
-      message: 'No offline copy yet. Tap Save offline on this instruction first, then Export to device.',
+      message: 'Download the instruction first, then tap Open file.',
     };
   }
 
